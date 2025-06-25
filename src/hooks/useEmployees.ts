@@ -48,7 +48,7 @@ export const useEmployees = () => {
 
       const { data, error: createError } = await supabase
         .from('profiles')
-        .insert([employeeData])
+        .insert(employeeData)
         .select()
         .single();
 
