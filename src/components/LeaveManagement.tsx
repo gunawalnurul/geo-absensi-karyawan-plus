@@ -30,7 +30,7 @@ const LeaveManagement = () => {
     { value: 'sick', label: 'Cuti Sakit' },
     { value: 'personal', label: 'Cuti Pribadi' },
     { value: 'maternity', label: 'Cuti Melahirkan' }
-  ];
+  ] as const;
 
   useEffect(() => {
     fetchLeaveRequests();
@@ -94,12 +94,12 @@ const LeaveManagement = () => {
         .insert({
           employee_id: profile.employee_id,
           employee_name: profile.name,
-          type: newLeave.type,
+          type: newLeave.type as 'annual' | 'sick' | 'personal' | 'maternity',
           start_date: newLeave.startDate,
           end_date: newLeave.endDate,
           days,
           reason: newLeave.reason,
-          status: 'pending'
+          status: 'pending' as const
         });
 
       if (error) {
