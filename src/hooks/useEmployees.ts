@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Employee = Tables<'profiles'>;
-export type CreateEmployeeData = Omit<TablesInsert<'profiles'>, 'id' | 'created_at' | 'updated_at'>;
+export type CreateEmployeeData = TablesInsert<'profiles'>;
 export type UpdateEmployeeData = Partial<TablesUpdate<'profiles'>>;
 
 export const useEmployees = () => {
