@@ -47,48 +47,34 @@ export const useEmployees = () => {
 
       console.log('Creating employee with data:', employeeData);
 
-      // First, create a user in Supabase Auth with the employee data in metadata
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: employeeData.email,
-        password: 'TempPassword123!', // Temporary password - should be changed on first login
-        options: {
-          data: {
-            employee_id: employeeData.employee_id,
-            name: employeeData.name,
-            department: employeeData.department,
-            position: employeeData.position,
-            salary: employeeData.salary,
-            role: employeeData.role || 'employee'
-          }
-        }
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
+      // Call our edge function to create the employee
+      const { data, error } = await supabase.functions.invoke('create-employee', {
+        body: employeeData,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error(`Failed to create user account: ${authError.message}`);
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to create employee');
       }
 
-      if (!authData.user) {
-        throw new Error('Failed to create user account');
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      // The profile should be automatically created by the handle_new_user trigger
-      // Let's wait a moment and then fetch the created profile
-      setTimeout(async () => {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .single();
+      if (data.data) {
+        setEmployees(prev => [data.data, ...prev]);
+      }
 
-        if (profileError) {
-          console.error('Profile fetch error:', profileError);
-        } else if (profileData) {
-          setEmployees(prev => [profileData, ...prev]);
-        }
-      }, 1000);
-
-      return { data: authData.user, error: null };
+      return { data: data.data, error: null };
     } catch (err) {
       console.error('Error creating employee:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to create employee';
