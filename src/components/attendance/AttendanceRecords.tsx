@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,8 @@ interface AttendanceRecord {
   };
 }
 
+type AttendanceStatus = 'present' | 'late' | 'absent';
+
 const AttendanceRecords = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,7 @@ const AttendanceRecords = () => {
     startDate: '',
     endDate: '',
     department: '',
-    status: '',
+    status: '' as AttendanceStatus | '',
     employee: ''
   });
   const [departments, setDepartments] = useState<string[]>([]);
@@ -80,7 +81,7 @@ const AttendanceRecords = () => {
         query = query.lte('date', filters.endDate);
       }
       if (filters.status) {
-        query = query.eq('status', filters.status);
+        query = query.eq('status', filters.status as AttendanceStatus);
       }
       if (filters.department) {
         query = query.eq('profiles.department', filters.department);
@@ -118,7 +119,7 @@ const AttendanceRecords = () => {
       startDate: '',
       endDate: '',
       department: '',
-      status: '',
+      status: '' as AttendanceStatus | '',
       employee: ''
     });
     setTimeout(() => {
