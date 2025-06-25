@@ -67,10 +67,10 @@ Deno.serve(async (req) => {
     const employeeData = await req.json()
     console.log('Creating employee with data:', employeeData)
 
-    // Create user using admin client (this won't affect current session)
+    // Create user using admin client with default password "karyawan123"
     const { data: authData, error: authError2 } = await supabaseAdmin.auth.admin.createUser({
       email: employeeData.email,
-      password: 'TempPassword123!', // Temporary password
+      password: 'karyawan123', // Default password that can be changed by employee
       email_confirm: true, // Auto-confirm email to skip verification
       user_metadata: {
         employee_id: employeeData.employee_id,
