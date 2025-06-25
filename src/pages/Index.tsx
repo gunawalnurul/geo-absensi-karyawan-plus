@@ -5,6 +5,7 @@ import LoginForm from '../components/LoginForm';
 import Layout from '../components/Layout';
 import Dashboard from '../components/Dashboard';
 import AttendanceSystem from '../components/AttendanceSystem';
+import AttendanceManagement from './AttendanceManagement';
 import LeaveManagement from '../components/LeaveManagement';
 import PayrollSystem from '../components/PayrollSystem';
 import EmployeeManagement from '../components/EmployeeManagement';
@@ -35,6 +36,8 @@ const Index = () => {
         return <Dashboard />;
       case 'attendance':
         return <AttendanceSystem />;
+      case 'attendance-management':
+        return <AttendanceManagement />;
       case 'leave':
         return <LeaveManagement />;
       case 'payroll':
