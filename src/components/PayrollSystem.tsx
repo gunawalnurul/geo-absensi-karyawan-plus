@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ const PayrollSystem = () => {
   const { user } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState('12');
   const [selectedYear, setSelectedYear] = useState('2024');
-  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState('all');
 
   // Mock payslip data
   const generatePaySlips = (): PaySlip[] => {
@@ -76,7 +75,7 @@ const PayrollSystem = () => {
   };
 
   const filteredPaySlips = user?.role === 'admin' 
-    ? (selectedEmployee ? paySlips.filter(p => p.employeeId === selectedEmployee) : paySlips)
+    ? (selectedEmployee !== 'all' ? paySlips.filter(p => p.employeeId === selectedEmployee) : paySlips)
     : paySlips.filter(p => p.employeeId === user?.employeeId);
 
   const downloadPaySlip = (paySlip: PaySlip) => {
@@ -168,7 +167,7 @@ Hari Hadir: ${paySlip.attendedDays}
                     <SelectValue placeholder="Semua karyawan" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Semua karyawan</SelectItem>
+                    <SelectItem value="all">Semua karyawan</SelectItem>
                     {mockEmployees.map(emp => (
                       <SelectItem key={emp.employeeId} value={emp.employeeId}>
                         {emp.name}
