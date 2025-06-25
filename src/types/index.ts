@@ -13,17 +13,21 @@ export interface User {
   avatar?: string;
 }
 
+// Updated Employee interface to match database schema
 export interface Employee {
   id: string;
-  employeeId: string;
+  employee_id: string;
   name: string;
   email: string;
   department: string;
   position: string;
   salary: number;
-  joinDate: string;
-  isOutOfTown: boolean;
+  join_date: string;
+  is_out_of_town: boolean;
   avatar?: string;
+  role: 'admin' | 'employee';
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Attendance {
