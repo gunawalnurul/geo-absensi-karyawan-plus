@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '../context/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, Users, LogIn, UserPlus } from 'lucide-react';
+import { Building2, LogIn, UserPlus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const LoginForm = () => {
@@ -28,8 +28,8 @@ const LoginForm = () => {
     confirmPassword: '',
     employee_id: '',
     name: '',
-    department: '',
-    position: '',
+    department: 'IT',
+    position: 'Developer',
     salary: 5000000,
     role: 'employee' as 'admin' | 'employee'
   });
@@ -54,14 +54,16 @@ const LoginForm = () => {
       return;
     }
 
+    console.log('Login attempt with:', loginData.email);
     const { error } = await signIn(loginData.email, loginData.password);
 
     if (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Gagal login. Periksa email dan password Anda.');
+      const errorMessage = error.message || 'Gagal login. Periksa email dan password Anda.';
+      setError(errorMessage);
       toast({
         title: 'Login Gagal',
-        description: error.message || 'Periksa email dan password Anda.',
+        description: errorMessage,
         variant: 'destructive'
       });
     } else {
@@ -92,6 +94,15 @@ const LoginForm = () => {
       return;
     }
 
+    console.log('Register attempt with:', {
+      email: registerData.email,
+      employee_id: registerData.employee_id,
+      name: registerData.name,
+      department: registerData.department,
+      position: registerData.position,
+      role: registerData.role
+    });
+
     const { error } = await signUp(registerData.email, registerData.password, {
       employee_id: registerData.employee_id,
       name: registerData.name,
@@ -103,16 +114,17 @@ const LoginForm = () => {
 
     if (error) {
       console.error('Register error:', error);
-      setError(error.message || 'Gagal mendaftar. Silakan coba lagi.');
+      const errorMessage = error.message || 'Gagal mendaftar. Silakan coba lagi.';
+      setError(errorMessage);
       toast({
         title: 'Registrasi Gagal',
-        description: error.message || 'Silakan coba lagi.',
+        description: errorMessage,
         variant: 'destructive'
       });
     } else {
       toast({
         title: 'Registrasi Berhasil',
-        description: 'Akun berhasil dibuat. Silakan login.'
+        description: 'Akun berhasil dibuat. Silakan cek email untuk konfirmasi.'
       });
       // Reset form
       setRegisterData({
@@ -121,8 +133,8 @@ const LoginForm = () => {
         confirmPassword: '',
         employee_id: '',
         name: '',
-        department: '',
-        position: '',
+        department: 'IT',
+        position: 'Developer',
         salary: 5000000,
         role: 'employee'
       });
@@ -204,13 +216,6 @@ const LoginForm = () => {
                     {loading ? 'Memproses...' : 'Masuk'}
                   </Button>
                 </form>
-
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 font-medium mb-2">Demo Akun:</p>
-                  <p className="text-xs text-gray-500">
-                    Buat akun baru atau hubungi admin untuk mendapatkan akses
-                  </p>
-                </div>
               </TabsContent>
 
               <TabsContent value="register">
