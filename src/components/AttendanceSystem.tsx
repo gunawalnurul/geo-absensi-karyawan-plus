@@ -4,15 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '../context/AuthContext';
-import { mockGeofenceLocations } from '../data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 import { MapPin, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const AttendanceSystem = () => {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState<string>('');
   const [isWithinGeofence, setIsWithinGeofence] = useState(false);
   const [nearestLocation, setNearestLocation] = useState<any>(null);
+  const [geofenceLocations, setGeofenceLocations] = useState<any[]>([]);
   const [attendanceStatus, setAttendanceStatus] = useState({
     checkedIn: false,
     checkedOut: false,
@@ -22,13 +23,58 @@ const AttendanceSystem = () => {
 
   useEffect(() => {
     getCurrentLocation();
+    fetchGeofenceLocations();
+    checkTodayAttendance();
   }, []);
 
   useEffect(() => {
-    if (currentLocation) {
+    if (currentLocation && geofenceLocations.length > 0) {
       checkGeofenceStatus();
     }
-  }, [currentLocation]);
+  }, [currentLocation, geofenceLocations]);
+
+  const fetchGeofenceLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('geofence_locations')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching geofence locations:', error);
+        return;
+      }
+
+      setGeofenceLocations(data || []);
+    } catch (error) {
+      console.error('Error fetching geofence locations:', error);
+    }
+  };
+
+  const checkTodayAttendance = async () => {
+    if (!profile?.employee_id) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('employee_id', profile.employee_id)
+        .eq('date', today)
+        .single();
+
+      if (data) {
+        setAttendanceStatus({
+          checkedIn: !!data.check_in,
+          checkedOut: !!data.check_out,
+          checkInTime: data.check_in ? new Date(data.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : null,
+          checkOutTime: data.check_out ? new Date(data.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : null
+        });
+      }
+    } catch (error) {
+      console.error('Error checking today attendance:', error);
+    }
+  };
 
   const getCurrentLocation = () => {
     if ('geolocation' in navigator) {
@@ -62,14 +108,12 @@ const AttendanceSystem = () => {
     let minDistance = Infinity;
     let withinAnyGeofence = false;
 
-    mockGeofenceLocations.forEach(location => {
-      if (!location.isActive) return;
-
+    geofenceLocations.forEach(location => {
       const distance = calculateDistance(
         currentLocation.lat,
         currentLocation.lng,
-        location.lat,
-        location.lng
+        parseFloat(location.lat),
+        parseFloat(location.lng)
       );
 
       if (distance < minDistance) {
@@ -83,7 +127,7 @@ const AttendanceSystem = () => {
     });
 
     setNearestLocation(closestLocation);
-    setIsWithinGeofence(withinAnyGeofence || user?.isOutOfTown || false);
+    setIsWithinGeofence(withinAnyGeofence || profile?.is_out_of_town || false);
   };
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -101,53 +145,112 @@ const AttendanceSystem = () => {
     return R * c;
   };
 
-  const handleCheckIn = () => {
-    if (!isWithinGeofence && !user?.isOutOfTown) {
+  const handleCheckIn = async () => {
+    if (!isWithinGeofence && !profile?.is_out_of_town) {
       alert('Anda berada di luar area kantor. Silakan mendekat ke kantor untuk melakukan absensi.');
       return;
     }
 
-    const now = new Date().toLocaleTimeString('id-ID', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-    
-    setAttendanceStatus(prev => ({
-      ...prev,
-      checkedIn: true,
-      checkInTime: now
-    }));
+    if (!profile?.employee_id) {
+      alert('Data karyawan tidak ditemukan.');
+      return;
+    }
 
-    console.log('Check-in berhasil:', {
-      employeeId: user?.employeeId,
-      time: now,
-      location: currentLocation,
-      address: nearestLocation?.name || 'Lokasi Remote'
-    });
+    try {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      const { error } = await supabase
+        .from('attendance')
+        .upsert({
+          employee_id: profile.employee_id,
+          date: today,
+          check_in: now.toISOString(),
+          location_lat: currentLocation?.lat,
+          location_lng: currentLocation?.lng,
+          location_address: nearestLocation?.name || 'Lokasi Remote',
+          is_out_of_town_access: profile.is_out_of_town,
+          status: 'present'
+        });
+
+      if (error) {
+        console.error('Error checking in:', error);
+        alert('Gagal melakukan check-in. Silakan coba lagi.');
+        return;
+      }
+
+      const timeString = now.toLocaleTimeString('id-ID', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      setAttendanceStatus(prev => ({
+        ...prev,
+        checkedIn: true,
+        checkInTime: timeString
+      }));
+
+      console.log('Check-in berhasil:', {
+        employeeId: profile.employee_id,
+        time: timeString,
+        location: currentLocation,
+        address: nearestLocation?.name || 'Lokasi Remote'
+      });
+    } catch (error) {
+      console.error('Error checking in:', error);
+      alert('Gagal melakukan check-in. Silakan coba lagi.');
+    }
   };
 
-  const handleCheckOut = () => {
+  const handleCheckOut = async () => {
     if (!attendanceStatus.checkedIn) {
       alert('Anda belum melakukan check-in hari ini.');
       return;
     }
 
-    const now = new Date().toLocaleTimeString('id-ID', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-    
-    setAttendanceStatus(prev => ({
-      ...prev,
-      checkedOut: true,
-      checkOutTime: now
-    }));
+    if (!profile?.employee_id) {
+      alert('Data karyawan tidak ditemukan.');
+      return;
+    }
 
-    console.log('Check-out berhasil:', {
-      employeeId: user?.employeeId,
-      time: now,
-      location: currentLocation
-    });
+    try {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      const { error } = await supabase
+        .from('attendance')
+        .update({
+          check_out: now.toISOString()
+        })
+        .eq('employee_id', profile.employee_id)
+        .eq('date', today);
+
+      if (error) {
+        console.error('Error checking out:', error);
+        alert('Gagal melakukan check-out. Silakan coba lagi.');
+        return;
+      }
+
+      const timeString = now.toLocaleTimeString('id-ID', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      setAttendanceStatus(prev => ({
+        ...prev,
+        checkedOut: true,
+        checkOutTime: timeString
+      }));
+
+      console.log('Check-out berhasil:', {
+        employeeId: profile.employee_id,
+        time: timeString,
+        location: currentLocation
+      });
+    } catch (error) {
+      console.error('Error checking out:', error);
+      alert('Gagal melakukan check-out. Silakan coba lagi.');
+    }
   };
 
   return (
@@ -204,7 +307,7 @@ const AttendanceSystem = () => {
                 </div>
               )}
 
-              {user?.isOutOfTown && (
+              {profile?.is_out_of_town && (
                 <div className="p-4 bg-yellow-50 rounded-lg">
                   <div className="flex items-center">
                     <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
@@ -250,7 +353,7 @@ const AttendanceSystem = () => {
                     <p className="text-gray-600">Belum Check In</p>
                     <Button 
                       onClick={handleCheckIn}
-                      disabled={!currentLocation || (!isWithinGeofence && !user?.isOutOfTown)}
+                      disabled={!currentLocation || (!isWithinGeofence && !profile?.is_out_of_town)}
                       className="mt-3 bg-green-600 hover:bg-green-700"
                     >
                       Check In Sekarang

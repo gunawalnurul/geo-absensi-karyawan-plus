@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,52 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '../context/AuthContext';
-import { LeaveRequest } from '../types';
+import { supabase } from '@/integrations/supabase/client';
 import { Plus, Calendar, Clock, Check, X } from 'lucide-react';
 
 const LeaveManagement = () => {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
-    {
-      id: '1',
-      employeeId: 'EMP001',
-      employeeName: 'Ahmad Wijaya',
-      type: 'annual',
-      startDate: '2024-01-15',
-      endDate: '2024-01-17',
-      days: 3,
-      reason: 'Liburan keluarga',
-      status: 'approved',
-      appliedDate: '2024-01-10',
-      approvedBy: 'admin',
-      approvedDate: '2024-01-11'
-    },
-    {
-      id: '2',
-      employeeId: 'EMP003',
-      employeeName: 'Budi Santoso',
-      type: 'sick',
-      startDate: '2024-01-20',
-      endDate: '2024-01-22',
-      days: 3,
-      reason: 'Sakit demam',
-      status: 'pending',
-      appliedDate: '2024-01-19'
-    },
-    {
-      id: '3',
-      employeeId: 'EMP005',
-      employeeName: 'Andi Pratama',
-      type: 'personal',
-      startDate: '2024-01-25',
-      endDate: '2024-01-25',
-      days: 1,
-      reason: 'Urusan pribadi',
-      status: 'rejected',
-      appliedDate: '2024-01-20'
-    }
-  ]);
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [newLeave, setNewLeave] = useState({
     type: '',
@@ -70,6 +32,41 @@ const LeaveManagement = () => {
     { value: 'maternity', label: 'Cuti Melahirkan' }
   ];
 
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, [profile]);
+
+  const fetchLeaveRequests = async () => {
+    if (!profile) return;
+
+    try {
+      setLoading(true);
+      
+      let query = supabase.from('leave_requests').select('*');
+      
+      // If employee, only show their requests
+      if (profile.role === 'employee') {
+        query = query.eq('employee_id', profile.employee_id);
+      }
+      
+      // Order by created_at descending
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching leave requests:', error);
+        return;
+      }
+
+      setLeaveRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching leave requests:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const calculateDays = (startDate: string, endDate: string) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -78,44 +75,78 @@ const LeaveManagement = () => {
     return diffDays;
   };
 
-  const handleSubmitLeave = () => {
+  const handleSubmitLeave = async () => {
     if (!newLeave.type || !newLeave.startDate || !newLeave.endDate || !newLeave.reason) {
       alert('Mohon lengkapi semua field');
       return;
     }
 
-    const days = calculateDays(newLeave.startDate, newLeave.endDate);
-    const request: LeaveRequest = {
-      id: Date.now().toString(),
-      employeeId: user?.employeeId || '',
-      employeeName: user?.name || '',
-      type: newLeave.type as any,
-      startDate: newLeave.startDate,
-      endDate: newLeave.endDate,
-      days,
-      reason: newLeave.reason,
-      status: 'pending',
-      appliedDate: new Date().toISOString().split('T')[0]
-    };
+    if (!profile?.employee_id || !profile?.name) {
+      alert('Data profil tidak lengkap');
+      return;
+    }
 
-    setLeaveRequests([request, ...leaveRequests]);
-    setNewLeave({ type: '', startDate: '', endDate: '', reason: '' });
-    setIsDialogOpen(false);
+    try {
+      const days = calculateDays(newLeave.startDate, newLeave.endDate);
+      
+      const { error } = await supabase
+        .from('leave_requests')
+        .insert({
+          employee_id: profile.employee_id,
+          employee_name: profile.name,
+          type: newLeave.type,
+          start_date: newLeave.startDate,
+          end_date: newLeave.endDate,
+          days,
+          reason: newLeave.reason,
+          status: 'pending'
+        });
+
+      if (error) {
+        console.error('Error submitting leave request:', error);
+        alert('Gagal mengajukan cuti. Silakan coba lagi.');
+        return;
+      }
+
+      // Refresh the list
+      await fetchLeaveRequests();
+      
+      // Reset form
+      setNewLeave({ type: '', startDate: '', endDate: '', reason: '' });
+      setIsDialogOpen(false);
+      
+      alert('Pengajuan cuti berhasil disubmit!');
+    } catch (error) {
+      console.error('Error submitting leave request:', error);
+      alert('Gagal mengajukan cuti. Silakan coba lagi.');
+    }
   };
 
-  const handleApproveReject = (id: string, status: 'approved' | 'rejected') => {
-    setLeaveRequests(prev => 
-      prev.map(req => 
-        req.id === id 
-          ? { 
-              ...req, 
-              status, 
-              approvedBy: user?.name || 'admin',
-              approvedDate: new Date().toISOString().split('T')[0]
-            }
-          : req
-      )
-    );
+  const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({
+          status,
+          approved_by: profile?.id,
+          approved_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating leave request:', error);
+        alert('Gagal mengupdate status. Silakan coba lagi.');
+        return;
+      }
+
+      // Refresh the list
+      await fetchLeaveRequests();
+      
+      alert(`Pengajuan cuti berhasil ${status === 'approved' ? 'disetujui' : 'ditolak'}!`);
+    } catch (error) {
+      console.error('Error updating leave request:', error);
+      alert('Gagal mengupdate status. Silakan coba lagi.');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -134,9 +165,16 @@ const LeaveManagement = () => {
     return typeObj?.label || type;
   };
 
-  const filteredRequests = user?.role === 'admin' 
-    ? leaveRequests 
-    : leaveRequests.filter(req => req.employeeId === user?.employeeId);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Memuat data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -147,7 +185,7 @@ const LeaveManagement = () => {
           <p className="text-gray-600">Kelola pengajuan cuti karyawan</p>
         </div>
         
-        {user?.role === 'employee' && (
+        {profile?.role === 'employee' && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700">
@@ -236,21 +274,21 @@ const LeaveManagement = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredRequests.length === 0 ? (
+            {leaveRequests.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 Belum ada pengajuan cuti
               </div>
             ) : (
-              filteredRequests.map((request) => (
+              leaveRequests.map((request) => (
                 <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-semibold text-gray-900">{request.employeeName}</h4>
+                      <h4 className="font-semibold text-gray-900">{request.employee_name}</h4>
                       <p className="text-sm text-gray-600">{getTypeLabel(request.type)}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       {getStatusBadge(request.status)}
-                      {user?.role === 'admin' && request.status === 'pending' && (
+                      {profile?.role === 'admin' && request.status === 'pending' && (
                         <div className="flex space-x-1">
                           <Button
                             size="sm"
@@ -276,14 +314,14 @@ const LeaveManagement = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="flex items-center text-gray-600">
                       <Calendar className="h-4 w-4 mr-2" />
-                      {new Date(request.startDate).toLocaleDateString('id-ID')} - {new Date(request.endDate).toLocaleDateString('id-ID')}
+                      {new Date(request.start_date).toLocaleDateString('id-ID')} - {new Date(request.end_date).toLocaleDateString('id-ID')}
                     </div>
                     <div className="flex items-center text-gray-600">
                       <Clock className="h-4 w-4 mr-2" />
                       {request.days} hari
                     </div>
                     <div className="text-gray-600">
-                      Diajukan: {new Date(request.appliedDate).toLocaleDateString('id-ID')}
+                      Diajukan: {new Date(request.applied_date).toLocaleDateString('id-ID')}
                     </div>
                   </div>
 
@@ -293,9 +331,9 @@ const LeaveManagement = () => {
                     </p>
                   </div>
 
-                  {request.status !== 'pending' && (
+                  {request.status !== 'pending' && request.approved_date && (
                     <div className="mt-2 text-xs text-gray-500">
-                      {request.status === 'approved' ? 'Disetujui' : 'Ditolak'} oleh {request.approvedBy} pada {new Date(request.approvedDate!).toLocaleDateString('id-ID')}
+                      {request.status === 'approved' ? 'Disetujui' : 'Ditolak'} pada {new Date(request.approved_date).toLocaleDateString('id-ID')}
                     </div>
                   )}
                 </div>
