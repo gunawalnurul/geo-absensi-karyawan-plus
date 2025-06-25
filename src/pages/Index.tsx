@@ -11,18 +11,21 @@ import EmployeeManagement from '../components/EmployeeManagement';
 import ReportsSystem from '../components/ReportsSystem';
 
 const Index = () => {
-  const { user, isLoading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Memuat aplikasi...</p>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || !profile) {
     return <LoginForm />;
   }
 

@@ -4,116 +4,349 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '../context/AuthContext';
-import { User, Calendar } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Building2, Users, LogIn, UserPlus } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { signIn, signUp, loading } = useAuth();
+  const { toast } = useToast();
+  
+  // Login form state
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: ''
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Register form state
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    employee_id: '',
+    name: '',
+    department: '',
+    position: '',
+    salary: 5000000,
+    role: 'employee' as 'admin' | 'employee'
+  });
+
+  const [error, setError] = useState('');
+
+  const departments = [
+    'IT', 'HR', 'Finance', 'Marketing', 'Operations', 'Sales'
+  ];
+
+  const positions = [
+    'Manager', 'Senior Developer', 'Developer', 'Analyst', 'Coordinator', 
+    'Specialist', 'Executive', 'Assistant'
+  ];
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
 
-    try {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Email atau password tidak valid');
-      }
-    } catch (err) {
-      setError('Terjadi kesalahan, silakan coba lagi');
-    } finally {
-      setIsLoading(false);
+    if (!loginData.email || !loginData.password) {
+      setError('Email dan password harus diisi');
+      return;
+    }
+
+    const { error } = await signIn(loginData.email, loginData.password);
+
+    if (error) {
+      console.error('Login error:', error);
+      setError(error.message || 'Gagal login. Periksa email dan password Anda.');
+      toast({
+        title: 'Login Gagal',
+        description: error.message || 'Periksa email dan password Anda.',
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Login Berhasil',
+        description: 'Selamat datang di sistem absensi!'
+      });
     }
   };
 
-  const demoCredentials = [
-    { label: 'Admin', email: 'admin@company.com', password: 'admin123' },
-    { label: 'Karyawan', email: 'ahmad.wijaya@company.com', password: 'employee123' }
-  ];
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validation
+    if (!registerData.email || !registerData.password || !registerData.name || !registerData.employee_id) {
+      setError('Semua field yang wajib harus diisi');
+      return;
+    }
+
+    if (registerData.password !== registerData.confirmPassword) {
+      setError('Password dan konfirmasi password tidak sama');
+      return;
+    }
+
+    if (registerData.password.length < 6) {
+      setError('Password minimal 6 karakter');
+      return;
+    }
+
+    const { error } = await signUp(registerData.email, registerData.password, {
+      employee_id: registerData.employee_id,
+      name: registerData.name,
+      department: registerData.department,
+      position: registerData.position,
+      salary: registerData.salary,
+      role: registerData.role
+    });
+
+    if (error) {
+      console.error('Register error:', error);
+      setError(error.message || 'Gagal mendaftar. Silakan coba lagi.');
+      toast({
+        title: 'Registrasi Gagal',
+        description: error.message || 'Silakan coba lagi.',
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Registrasi Berhasil',
+        description: 'Akun berhasil dibuat. Silakan login.'
+      });
+      // Reset form
+      setRegisterData({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        employee_id: '',
+        name: '',
+        department: '',
+        position: '',
+        salary: 5000000,
+        role: 'employee'
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="bg-blue-600 p-3 rounded-full">
-              <Calendar className="h-8 w-8 text-white" />
+              <Building2 className="h-8 w-8 text-white" />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Sistem Absensi</h1>
-          <p className="text-gray-600 mt-2">Masuk ke akun Anda</p>
+          <p className="text-gray-600 mt-2">Kelola absensi karyawan dengan mudah</p>
         </div>
 
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-center">Login</CardTitle>
+            <CardTitle className="text-center">Masuk ke Akun Anda</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nama@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full"
-                />
-              </div>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login" className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Masuk
+                </TabsTrigger>
+                <TabsTrigger value="register" className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Daftar
+                </TabsTrigger>
+              </TabsList>
 
               {error && (
-                <div className="text-red-500 text-sm text-center">{error}</div>
+                <Alert className="mt-4" variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                {isLoading ? 'Memproses...' : 'Masuk'}
-              </Button>
-            </form>
-
-            <div className="mt-6 pt-4 border-t">
-              <p className="text-sm text-gray-600 text-center mb-3">Demo Credentials:</p>
-              <div className="space-y-2">
-                {demoCredentials.map((cred, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      setEmail(cred.email);
-                      setPassword(cred.password);
-                    }}
-                  >
-                    <span className="text-sm font-medium">{cred.label}</span>
-                    <User className="h-4 w-4 text-gray-400" />
+              <TabsContent value="login">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="admin@example.com"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                    {loading ? 'Memproses...' : 'Masuk'}
+                  </Button>
+                </form>
+
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600 font-medium mb-2">Demo Akun:</p>
+                  <p className="text-xs text-gray-500">
+                    Buat akun baru atau hubungi admin untuk mendapatkan akses
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="register">
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="employee_id">ID Karyawan *</Label>
+                      <Input
+                        id="employee_id"
+                        placeholder="EMP001"
+                        value={registerData.employee_id}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, employee_id: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nama Lengkap *</Label>
+                      <Input
+                        id="name"
+                        placeholder="John Doe"
+                        value={registerData.name}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reg_email">Email *</Label>
+                    <Input
+                      id="reg_email"
+                      type="email"
+                      placeholder="john@company.com"
+                      value={registerData.email}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reg_password">Password *</Label>
+                      <Input
+                        id="reg_password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={registerData.password}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm_password">Konfirmasi Password *</Label>
+                      <Input
+                        id="confirm_password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={registerData.confirmPassword}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="department">Departemen</Label>
+                      <Select value={registerData.department} onValueChange={(value) => setRegisterData(prev => ({ ...prev, department: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih departemen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map(dept => (
+                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="position">Posisi</Label>
+                      <Select value={registerData.position} onValueChange={(value) => setRegisterData(prev => ({ ...prev, position: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih posisi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map(pos => (
+                            <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="salary">Gaji (IDR)</Label>
+                      <Input
+                        id="salary"
+                        type="number"
+                        placeholder="5000000"
+                        value={registerData.salary}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, salary: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <Select value={registerData.role} onValueChange={(value: 'admin' | 'employee') => setRegisterData(prev => ({ ...prev, role: value }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
+                    {loading ? 'Mendaftar...' : 'Daftar Akun'}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
+
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500">
+            © 2024 Sistem Absensi. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -2,16 +2,15 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '../context/AuthContext';
-import { mockEmployees } from '../data/mockData';
 import { Calendar, Users, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
   const stats = [
     {
       title: 'Total Karyawan',
-      value: mockEmployees.length,
+      value: 20,
       icon: Users,
       color: 'bg-blue-500',
       change: '+2.5%'
@@ -52,17 +51,22 @@ const Dashboard = () => {
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg p-6 text-white">
         <h1 className="text-2xl font-bold mb-2">
-          Selamat Datang, {user?.name}! 👋
+          Selamat Datang, {profile?.name}! 👋
         </h1>
         <p className="text-blue-100">
-          {user?.role === 'admin' 
+          {profile?.role === 'admin' 
             ? 'Kelola sistem absensi dan monitor aktivitas karyawan' 
             : 'Jangan lupa untuk melakukan absensi hari ini'}
         </p>
+        <div className="mt-4 text-sm text-blue-100">
+          <span className="font-medium">Role:</span> {profile?.role === 'admin' ? 'Administrator' : 'Karyawan'} |{' '}
+          <span className="font-medium">ID:</span> {profile?.employee_id} |{' '}
+          <span className="font-medium">Dept:</span> {profile?.department}
+        </div>
       </div>
 
       {/* Stats Cards */}
-      {user?.role === 'admin' && (
+      {profile?.role === 'admin' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -147,7 +151,7 @@ const Dashboard = () => {
       </div>
 
       {/* Today's Summary for Employee */}
-      {user?.role === 'employee' && (
+      {profile?.role === 'employee' && (
         <Card>
           <CardHeader>
             <CardTitle>Ringkasan Hari Ini</CardTitle>
@@ -155,7 +159,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">08:30</div>
+                <div className="text-2xl font-bold text-green-600">--:--</div>
                 <p className="text-sm text-green-800">Waktu Masuk</p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -163,7 +167,7 @@ const Dashboard = () => {
                 <p className="text-sm text-blue-800">Waktu Keluar</p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">7.5</div>
+                <div className="text-2xl font-bold text-yellow-600">0</div>
                 <p className="text-sm text-yellow-800">Jam Kerja</p>
               </div>
             </div>
