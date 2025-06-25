@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Employee = Tables<'profiles'>;
-export type CreateEmployeeData = TablesInsert<'profiles'>;
+export type CreateEmployeeData = Omit<TablesInsert<'profiles'>, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateEmployeeData = Partial<TablesUpdate<'profiles'>>;
 
 export const useEmployees = () => {
@@ -46,18 +45,50 @@ export const useEmployees = () => {
         throw new Error('Unauthorized: Only admins can create employees');
       }
 
-      const { data, error: createError } = await supabase
-        .from('profiles')
-        .insert(employeeData)
-        .select()
-        .single();
+      console.log('Creating employee with data:', employeeData);
 
-      if (createError) {
-        throw createError;
+      // First, create a user in Supabase Auth with the employee data in metadata
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: employeeData.email,
+        password: 'TempPassword123!', // Temporary password - should be changed on first login
+        options: {
+          data: {
+            employee_id: employeeData.employee_id,
+            name: employeeData.name,
+            department: employeeData.department,
+            position: employeeData.position,
+            salary: employeeData.salary,
+            role: employeeData.role || 'employee'
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error(`Failed to create user account: ${authError.message}`);
       }
 
-      setEmployees(prev => [data, ...prev]);
-      return { data, error: null };
+      if (!authData.user) {
+        throw new Error('Failed to create user account');
+      }
+
+      // The profile should be automatically created by the handle_new_user trigger
+      // Let's wait a moment and then fetch the created profile
+      setTimeout(async () => {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+        } else if (profileData) {
+          setEmployees(prev => [profileData, ...prev]);
+        }
+      }, 1000);
+
+      return { data: authData.user, error: null };
     } catch (err) {
       console.error('Error creating employee:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to create employee';
