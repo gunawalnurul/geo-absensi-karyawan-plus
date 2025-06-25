@@ -10,7 +10,8 @@ import {
   Users, 
   BarChart3, 
   LogOut,
-  Building2
+  Building2,
+  MapPin
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -25,6 +26,7 @@ const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'employee'] },
     { id: 'attendance', label: 'Absensi', icon: Clock, roles: ['admin', 'employee'] },
+    { id: 'attendance-management', label: 'Kelola Absensi', icon: MapPin, roles: ['admin'] },
     { id: 'leave', label: 'Cuti', icon: Calendar, roles: ['admin', 'employee'] },
     { id: 'payroll', label: 'Payroll', icon: DollarSign, roles: ['admin', 'employee'] },
     { id: 'employees', label: 'Karyawan', icon: Users, roles: ['admin'] },
