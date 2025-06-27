@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const AttendanceSystem = () => {
   const [nearestLocation, setNearestLocation] = useState<any>(null);
   const [geofenceLocations, setGeofenceLocations] = useState<any[]>([]);
   const [showWFHForm, setShowWFHForm] = useState(false);
+  const [canAttend, setCanAttend] = useState(false);
   const [attendanceStatus, setAttendanceStatus] = useState({
     checkedIn: false,
     checkedOut: false,
@@ -36,6 +38,11 @@ const AttendanceSystem = () => {
       checkGeofenceStatus();
     }
   }, [currentLocation, geofenceLocations]);
+
+  useEffect(() => {
+    // Update attendance capability when WFH status or geofence status changes
+    setCanAttend(isWithinGeofence || hasApprovedWFH);
+  }, [isWithinGeofence, hasApprovedWFH]);
 
   const checkApprovedWFHRequest = async () => {
     if (!profile?.employee_id) return;
@@ -93,12 +100,18 @@ const AttendanceSystem = () => {
 
     try {
       const today = new Date().toISOString().split('T')[0];
+      // Use maybeSingle() instead of single() to avoid 406 error when no data exists
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
         .eq('employee_id', profile.employee_id)
         .eq('date', today)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking today attendance:', error);
+        return;
+      }
 
       if (data) {
         setAttendanceStatus({
@@ -122,10 +135,28 @@ const AttendanceSystem = () => {
             lng: position.coords.longitude
           });
           setLocationError('');
+          console.log('Location obtained successfully:', position.coords);
         },
         (error) => {
           console.error('Error getting location:', error);
-          setLocationError('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan izin lokasi diberikan.');
+          let errorMessage = '';
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Akses lokasi ditolak. Untuk dapat absensi, mohon izinkan akses lokasi di browser atau gunakan fitur Work From Home.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi.';
+              break;
+            default:
+              errorMessage = 'Terjadi error dalam mengambil lokasi.';
+              break;
+          }
+          
+          setLocationError(errorMessage);
         },
         {
           enableHighAccuracy: true,
@@ -164,8 +195,7 @@ const AttendanceSystem = () => {
     });
 
     setNearestLocation(closestLocation);
-    // Allow attendance if within geofence OR has approved WFH request
-    setIsWithinGeofence(withinAnyGeofence || hasApprovedWFH);
+    setIsWithinGeofence(withinAnyGeofence);
   };
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -187,11 +217,12 @@ const AttendanceSystem = () => {
     console.log('Check-in attempt:', {
       isWithinGeofence,
       hasApprovedWFH,
-      canCheckIn: isWithinGeofence || hasApprovedWFH
+      canAttend,
+      currentLocation
     });
 
-    if (!isWithinGeofence && !hasApprovedWFH) {
-      alert('Anda berada di luar area kantor. Silakan mendekat ke kantor atau ajukan permintaan Work From Home untuk melakukan absensi.');
+    if (!canAttend) {
+      alert('Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home.');
       return;
     }
 
@@ -234,6 +265,7 @@ const AttendanceSystem = () => {
         checkInTime: timeString
       }));
 
+      alert('Check-in berhasil!');
       console.log('Check-in berhasil:', {
         employeeId: profile.employee_id,
         time: timeString,
@@ -286,6 +318,7 @@ const AttendanceSystem = () => {
         checkOutTime: timeString
       }));
 
+      alert('Check-out berhasil!');
       console.log('Check-out berhasil:', {
         employeeId: profile.employee_id,
         time: timeString,
@@ -317,7 +350,7 @@ const AttendanceSystem = () => {
           {locationError ? (
             <div className="flex items-center p-4 bg-red-50 rounded-lg">
               <XCircle className="h-5 w-5 text-red-500 mr-3" />
-              <div>
+              <div className="flex-1">
                 <p className="text-red-800 font-medium">Error Lokasi</p>
                 <p className="text-red-600 text-sm">{locationError}</p>
                 <Button 
@@ -342,8 +375,8 @@ const AttendanceSystem = () => {
                     </p>
                   </div>
                 </div>
-                <Badge variant={isWithinGeofence ? "default" : "destructive"}>
-                  {isWithinGeofence ? 'Dapat Absensi' : 'Tidak Dapat Absensi'}
+                <Badge variant={canAttend ? "default" : "destructive"}>
+                  {canAttend ? 'Dapat Absensi' : 'Tidak Dapat Absensi'}
                 </Badge>
               </div>
 
@@ -375,7 +408,7 @@ const AttendanceSystem = () => {
               )}
 
               {/* WFH Request Option - Only show if not within geofence and no approved WFH */}
-              {!isWithinGeofence && !hasApprovedWFH && (
+              {!canAttend && (
                 <div className="p-4 bg-orange-50 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -411,6 +444,37 @@ const AttendanceSystem = () => {
               <p className="text-gray-600">Mengambil lokasi...</p>
             </div>
           )}
+
+          {/* Alternative attendance option when location is denied */}
+          {locationError && !hasApprovedWFH && (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
+                  <div>
+                    <p className="text-yellow-800 font-medium">Akses Lokasi Ditolak</p>
+                    <p className="text-yellow-600 text-sm">
+                      Untuk dapat absensi tanpa akses lokasi, silakan ajukan Work From Home
+                    </p>
+                  </div>
+                </div>
+                <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Home className="h-4 w-4 mr-2" />
+                      Ajukan WFH
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <WFHRequestForm 
+                      onClose={() => setShowWFHForm(false)}
+                      onSuccess={handleWFHSuccess}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -437,11 +501,16 @@ const AttendanceSystem = () => {
                     <p className="text-gray-600">Belum Check In</p>
                     <Button 
                       onClick={handleCheckIn}
-                      disabled={!currentLocation || (!isWithinGeofence && !hasApprovedWFH)}
+                      disabled={!canAttend}
                       className="mt-3 bg-green-600 hover:bg-green-700"
                     >
                       Check In Sekarang
                     </Button>
+                    {!canAttend && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        {locationError ? 'Izinkan akses lokasi atau ajukan WFH' : 'Berada di luar area kantor'}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
