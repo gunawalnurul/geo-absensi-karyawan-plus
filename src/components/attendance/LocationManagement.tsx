@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Edit, Trash2, Navigation } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MapPin, Plus, Edit, Trash2, Navigation, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import LocationMap from './LocationMap';
 
 interface GeofenceLocation {
   id: string;
@@ -77,6 +79,18 @@ const LocationManagement = () => {
         }
       );
     }
+  };
+
+  const handleMapLocationSelect = (lat: number, lng: number, address: string) => {
+    setNewLocation(prev => ({
+      ...prev,
+      lat: lat.toString(),
+      lng: lng.toString()
+    }));
+    toast({
+      title: 'Lokasi Dipilih',
+      description: 'Koordinat dari peta telah diisi otomatis'
+    });
   };
 
   const handleAddLocation = async () => {
@@ -210,7 +224,6 @@ const LocationManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Add New Location */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -219,50 +232,85 @@ const LocationManagement = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama Lokasi</Label>
-              <Input
-                id="name"
-                value={newLocation.name}
-                onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Contoh: Kantor Pusat Jakarta"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="radius">Radius (meter)</Label>
-              <Input
-                id="radius"
-                type="number"
-                value={newLocation.radius}
-                onChange={(e) => setNewLocation(prev => ({ ...prev, radius: e.target.value }))}
-                placeholder="100"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lat">Latitude</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="lat"
-                  value={newLocation.lat}
-                  onChange={(e) => setNewLocation(prev => ({ ...prev, lat: e.target.value }))}
-                  placeholder="-6.200000"
-                />
-                <Button variant="outline" onClick={getCurrentLocation}>
-                  <Navigation className="h-4 w-4" />
-                </Button>
+          <Tabs defaultValue="manual" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual">Input Manual</TabsTrigger>
+              <TabsTrigger value="map">Pilih dari Peta</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="manual" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nama Lokasi</Label>
+                  <Input
+                    id="name"
+                    value={newLocation.name}
+                    onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Contoh: Kantor Pusat Jakarta"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="radius">Radius (meter)</Label>
+                  <Input
+                    id="radius"
+                    type="number"
+                    value={newLocation.radius}
+                    onChange={(e) => setNewLocation(prev => ({ ...prev, radius: e.target.value }))}
+                    placeholder="100"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lat">Latitude</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="lat"
+                      value={newLocation.lat}
+                      onChange={(e) => setNewLocation(prev => ({ ...prev, lat: e.target.value }))}
+                      placeholder="-6.200000"
+                    />
+                    <Button variant="outline" onClick={getCurrentLocation}>
+                      <Navigation className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lng">Longitude</Label>
+                  <Input
+                    id="lng"
+                    value={newLocation.lng}
+                    onChange={(e) => setNewLocation(prev => ({ ...prev, lng: e.target.value }))}
+                    placeholder="106.816666"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lng">Longitude</Label>
-              <Input
-                id="lng"
-                value={newLocation.lng}
-                onChange={(e) => setNewLocation(prev => ({ ...prev, lng: e.target.value }))}
-                placeholder="106.816666"
-              />
-            </div>
-          </div>
+            </TabsContent>
+            
+            <TabsContent value="map" className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="map-name">Nama Lokasi</Label>
+                  <Input
+                    id="map-name"
+                    value={newLocation.name}
+                    onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Contoh: Kantor Pusat Jakarta"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="map-radius">Radius (meter)</Label>
+                  <Input
+                    id="map-radius"
+                    type="number"
+                    value={newLocation.radius}
+                    onChange={(e) => setNewLocation(prev => ({ ...prev, radius: e.target.value }))}
+                    placeholder="100"
+                  />
+                </div>
+                <LocationMap onLocationSelect={handleMapLocationSelect} />
+              </div>
+            </TabsContent>
+          </Tabs>
+          
           <div className="mt-4 flex justify-end">
             <Button onClick={handleAddLocation}>
               <Plus className="h-4 w-4 mr-2" />

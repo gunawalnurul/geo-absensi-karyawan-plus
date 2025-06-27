@@ -1,11 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { MapPin, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, XCircle, AlertCircle, Home } from 'lucide-react';
+import WFHRequestForm from './attendance/WFHRequestForm';
 
 const AttendanceSystem = () => {
   const { profile } = useAuth();
@@ -14,6 +15,7 @@ const AttendanceSystem = () => {
   const [isWithinGeofence, setIsWithinGeofence] = useState(false);
   const [nearestLocation, setNearestLocation] = useState<any>(null);
   const [geofenceLocations, setGeofenceLocations] = useState<any[]>([]);
+  const [showWFHForm, setShowWFHForm] = useState(false);
   const [attendanceStatus, setAttendanceStatus] = useState({
     checkedIn: false,
     checkedOut: false,
@@ -253,6 +255,11 @@ const AttendanceSystem = () => {
     }
   };
 
+  const handleWFHSuccess = () => {
+    // Refresh the page or update state as needed
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-6">
       {/* Location Status */}
@@ -317,6 +324,37 @@ const AttendanceSystem = () => {
                         Anda memiliki izin untuk absensi dari luar area kantor.
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WFH Request Option */}
+              {!isWithinGeofence && !profile?.is_out_of_town && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Home className="h-5 w-5 text-orange-500 mr-3" />
+                      <div>
+                        <p className="text-orange-800 font-medium">Berada di Luar Area Kantor</p>
+                        <p className="text-orange-600 text-sm">
+                          Ajukan permintaan Work From Home/Anywhere untuk dapat melakukan absensi
+                        </p>
+                      </div>
+                    </div>
+                    <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Home className="h-4 w-4 mr-2" />
+                          Ajukan WFH
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <WFHRequestForm 
+                          onClose={() => setShowWFHForm(false)}
+                          onSuccess={handleWFHSuccess}
+                        />
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               )}
