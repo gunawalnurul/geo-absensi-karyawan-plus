@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Users, Clock, TrendingUp, MapPin, FileText, DollarSign } from 'lucide-react';
 
-const Dashboard = () => {
+interface DashboardProps {
+  onTabChange?: (tab: string) => void;
+}
+
+const Dashboard = ({ onTabChange }: DashboardProps) => {
   const { profile } = useAuth();
   const [stats, setStats] = useState({
     totalEmployees: 0,
@@ -189,8 +192,9 @@ const Dashboard = () => {
   };
 
   const handleNavigate = (tab: string) => {
-    // This would be implemented with proper navigation
-    console.log(`Navigate to ${tab}`);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
   };
 
   const adminStats = [
