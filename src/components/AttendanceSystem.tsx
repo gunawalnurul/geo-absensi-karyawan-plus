@@ -39,7 +39,7 @@ const AttendanceSystem = () => {
   }, [currentLocation, geofenceLocations]);
 
   useEffect(() => {
-    // FIXED: Simplified attendance capability logic
+    // FIXED: Update canAttend when WFH status or geofence status changes
     const newCanAttend = isWithinGeofence || hasApprovedWFH;
     console.log('🔄 Updating canAttend:', { 
       isWithinGeofence, 
@@ -89,7 +89,6 @@ const AttendanceSystem = () => {
       
       const hasApproved = data && data.length > 0;
       
-      // FIXED: Force state update with explicit logging
       console.log('🔄 Setting hasApprovedWFH to:', hasApproved);
       setHasApprovedWFH(hasApproved);
       
@@ -177,20 +176,22 @@ const AttendanceSystem = () => {
           
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Akses lokasi ditolak. Pastikan Anda memiliki persetujuan Work From Home untuk dapat melakukan absensi.';
+              errorMessage = 'Akses lokasi ditolak. Jika Anda memiliki persetujuan Work From Home yang aktif, Anda tetap dapat melakukan absensi.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau ajukan Work From Home.';
+              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau gunakan Work From Home jika disetujui.';
               break;
             case error.TIMEOUT:
-              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau ajukan Work From Home.';
+              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau gunakan Work From Home jika disetujui.';
               break;
             default:
-              errorMessage = 'Terjadi error dalam mengambil lokasi. Ajukan Work From Home jika diperlukan.';
+              errorMessage = 'Terjadi error dalam mengambil lokasi. Gunakan Work From Home jika disetujui.';
               break;
           }
           
           setLocationError(errorMessage);
+          // FIXED: Don't block attendance when location is denied but WFH is approved
+          console.log('📍 Location error but checking WFH status...');
         },
         {
           enableHighAccuracy: true,
@@ -199,7 +200,7 @@ const AttendanceSystem = () => {
         }
       );
     } else {
-      setLocationError('Geolocation tidak didukung di browser ini. Silakan ajukan Work From Home untuk absensi.');
+      setLocationError('Geolocation tidak didukung di browser ini. Silakan gunakan Work From Home jika disetujui.');
     }
   };
 
@@ -264,9 +265,15 @@ const AttendanceSystem = () => {
       attendanceStatus
     });
 
-    // FIXED: Clear logic for attendance eligibility
     if (!canAttend) {
-      const message = 'Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.';
+      let message = 'Anda tidak dapat melakukan absensi. ';
+      if (locationError && !hasApprovedWFH) {
+        message += 'Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.';
+      } else if (!isWithinGeofence && !hasApprovedWFH) {
+        message += 'Anda berada di luar area kantor dan tidak memiliki persetujuan Work From Home.';
+      } else {
+        message += 'Status belum memenuhi syarat untuk absensi.';
+      }
       alert(message);
       return;
     }
@@ -288,10 +295,12 @@ const AttendanceSystem = () => {
         locationAddress = 'Work From Home/Anywhere';
         lat = currentLocation?.lat || null;
         lng = currentLocation?.lng || null;
+        console.log('✅ Using WFH mode for attendance');
       } else if (nearestLocation && isWithinGeofence) {
         locationAddress = nearestLocation.name;
         lat = currentLocation?.lat;
         lng = currentLocation?.lng;
+        console.log('✅ Using office location for attendance');
       } else {
         locationAddress = 'Lokasi Remote';
         lat = currentLocation?.lat || null;
@@ -452,15 +461,18 @@ const AttendanceSystem = () => {
                 </div>
               </div>
 
-              {/* Show WFH status even when location is denied */}
+              {/* ENHANCED: Show WFH status more prominently when location is denied */}
               {hasApprovedWFH && (
-                <div className="p-4 bg-green-50 rounded-lg">
+                <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
                   <div className="flex items-center">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    <CheckCircle className="h-6 w-6 text-green-500 mr-3" />
                     <div>
-                      <p className="text-green-800 font-medium">Work From Home Disetujui</p>
+                      <p className="text-green-800 font-bold text-lg">✅ Work From Home Disetujui</p>
+                      <p className="text-green-700 font-medium">
+                        Anda DAPAT melakukan absensi meskipun akses lokasi ditolak!
+                      </p>
                       <p className="text-green-600 text-sm">
-                        Anda dapat melakukan absensi meskipun akses lokasi ditolak karena memiliki persetujuan WFH.
+                        Klik tombol "Check In Sekarang" di bawah untuk melakukan absensi.
                       </p>
                     </div>
                   </div>
@@ -606,18 +618,22 @@ const AttendanceSystem = () => {
                     <Button 
                       onClick={handleCheckIn}
                       disabled={!canAttend}
-                      className="mt-3 bg-green-600 hover:bg-green-700"
+                      className={`mt-3 ${canAttend ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400'}`}
                     >
-                      Check In Sekarang
+                      {canAttend ? 'Check In Sekarang' : 'Tidak Dapat Check In'}
                     </Button>
-                    {!canAttend && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {hasApprovedWFH 
-                          ? 'Memproses status WFH...' 
-                          : 'Berada di luar area kantor dan tidak ada WFH aktif'
-                        }
-                      </p>
-                    )}
+                    <div className="mt-2 text-xs">
+                      {hasApprovedWFH && (
+                        <p className="text-green-600 font-medium">
+                          ✅ WFH Disetujui - Dapat Check In
+                        </p>
+                      )}
+                      {!canAttend && !hasApprovedWFH && (
+                        <p className="text-gray-500">
+                          Berada di luar area kantor dan tidak ada WFH aktif
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
