@@ -12,7 +12,7 @@ import EmployeeTable from './employee/EmployeeTable';
 
 const EmployeeManagement = () => {
   const { profile } = useAuth();
-  const { employees, loading, error, addEmployee, updateEmployee, deleteEmployee } = useEmployees();
+  const { employees, loading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -38,7 +38,7 @@ const EmployeeManagement = () => {
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
-      await addEmployee(employeeData);
+      await createEmployee(employeeData);
       setShowForm(false);
     } catch (error) {
       console.error('Error adding employee:', error);
@@ -55,10 +55,10 @@ const EmployeeManagement = () => {
     }
   };
 
-  const handleDeleteEmployee = async (id: string) => {
+  const handleDeleteEmployee = async (employee: any) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus karyawan ini?')) {
       try {
-        await deleteEmployee(id);
+        await deleteEmployee(employee.id);
       } catch (error) {
         console.error('Error deleting employee:', error);
       }
@@ -190,6 +190,7 @@ const EmployeeManagement = () => {
             employees={filteredEmployees}
             onEdit={handleEditEmployee}
             onDelete={handleDeleteEmployee}
+            canManage={true}
           />
         </CardContent>
       </Card>
