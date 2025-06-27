@@ -41,18 +41,24 @@ const AttendanceSystem = () => {
 
   useEffect(() => {
     // Update attendance capability when WFH status or geofence status changes
+    console.log('Updating canAttend:', { isWithinGeofence, hasApprovedWFH });
     setCanAttend(isWithinGeofence || hasApprovedWFH);
   }, [isWithinGeofence, hasApprovedWFH]);
 
   const checkApprovedWFHRequest = async () => {
-    if (!profile?.employee_id) return;
+    if (!profile?.employee_id) {
+      console.log('No employee_id found in profile');
+      return;
+    }
 
     try {
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
       
-      console.log('Checking WFH request for date:', todayString);
-      console.log('Employee ID:', profile.employee_id);
+      console.log('Checking WFH request for:', {
+        employee_id: profile.employee_id,
+        date: todayString
+      });
       
       const { data, error } = await supabase
         .from('out_of_town_requests')
@@ -67,11 +73,20 @@ const AttendanceSystem = () => {
         return;
       }
 
-      console.log('WFH request data:', data);
-      const hasApproved = data && data.length > 0;
-      console.log('Has approved WFH:', hasApproved);
+      console.log('WFH request query result:', {
+        data,
+        count: data?.length,
+        hasApproved: data && data.length > 0
+      });
       
+      const hasApproved = data && data.length > 0;
       setHasApprovedWFH(hasApproved);
+      
+      if (hasApproved) {
+        console.log('✅ Approved WFH found:', data[0]);
+      } else {
+        console.log('❌ No approved WFH found for today');
+      }
     } catch (error) {
       console.error('Error checking WFH request:', error);
     }
@@ -89,6 +104,7 @@ const AttendanceSystem = () => {
         return;
       }
 
+      console.log('Geofence locations fetched:', data?.length);
       setGeofenceLocations(data || []);
     } catch (error) {
       console.error('Error fetching geofence locations:', error);
@@ -100,7 +116,6 @@ const AttendanceSystem = () => {
 
     try {
       const today = new Date().toISOString().split('T')[0];
-      // Use maybeSingle() instead of single() to avoid 406 error when no data exists
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
@@ -130,29 +145,30 @@ const AttendanceSystem = () => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCurrentLocation({
+          const coords = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setCurrentLocation(coords);
           setLocationError('');
-          console.log('Location obtained successfully:', position.coords);
+          console.log('Location obtained successfully:', coords);
         },
         (error) => {
-          console.error('Error getting location:', error);
+          console.error('Geolocation error:', error);
           let errorMessage = '';
           
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Akses lokasi ditolak. Untuk dapat absensi, mohon izinkan akses lokasi di browser atau gunakan fitur Work From Home.';
+              errorMessage = 'Akses lokasi ditolak. Jika Anda memiliki persetujuan Work From Home, Anda tetap dapat melakukan absensi.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif.';
+              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau gunakan fitur Work From Home.';
               break;
             case error.TIMEOUT:
-              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi.';
+              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau gunakan Work From Home.';
               break;
             default:
-              errorMessage = 'Terjadi error dalam mengambil lokasi.';
+              errorMessage = 'Terjadi error dalam mengambil lokasi. Gunakan Work From Home jika diperlukan.';
               break;
           }
           
@@ -165,7 +181,7 @@ const AttendanceSystem = () => {
         }
       );
     } else {
-      setLocationError('Geolocation tidak didukung di browser ini.');
+      setLocationError('Geolocation tidak didukung di browser ini. Silakan ajukan Work From Home untuk absensi.');
     }
   };
 
@@ -194,6 +210,12 @@ const AttendanceSystem = () => {
       }
     });
 
+    console.log('Geofence check result:', {
+      withinAnyGeofence,
+      closestDistance: closestLocation?.distance,
+      closestLocation: closestLocation?.name
+    });
+
     setNearestLocation(closestLocation);
     setIsWithinGeofence(withinAnyGeofence);
   };
@@ -218,11 +240,12 @@ const AttendanceSystem = () => {
       isWithinGeofence,
       hasApprovedWFH,
       canAttend,
-      currentLocation
+      currentLocation,
+      profile: profile?.employee_id
     });
 
     if (!canAttend) {
-      alert('Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home.');
+      alert('Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.');
       return;
     }
 
@@ -235,17 +258,29 @@ const AttendanceSystem = () => {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
+      // Determine location info based on attendance type
+      let locationAddress = '';
+      if (hasApprovedWFH) {
+        locationAddress = 'Work From Home/Anywhere';
+      } else if (nearestLocation) {
+        locationAddress = nearestLocation.name;
+      } else {
+        locationAddress = 'Lokasi Remote';
+      }
+      
       const { error } = await supabase
         .from('attendance')
         .upsert({
           employee_id: profile.employee_id,
           date: today,
           check_in: now.toISOString(),
-          location_lat: currentLocation?.lat,
-          location_lng: currentLocation?.lng,
-          location_address: nearestLocation?.name || (hasApprovedWFH ? 'Work From Home' : 'Lokasi Remote'),
+          location_lat: currentLocation?.lat || null,
+          location_lng: currentLocation?.lng || null,
+          location_address: locationAddress,
           is_out_of_town_access: hasApprovedWFH,
           status: 'present'
+        }, {
+          onConflict: 'employee_id,date'
         });
 
       if (error) {
@@ -266,11 +301,12 @@ const AttendanceSystem = () => {
       }));
 
       alert('Check-in berhasil!');
-      console.log('Check-in berhasil:', {
+      console.log('✅ Check-in successful:', {
         employeeId: profile.employee_id,
         time: timeString,
         location: currentLocation,
-        address: nearestLocation?.name || (hasApprovedWFH ? 'Work From Home' : 'Lokasi Remote')
+        address: locationAddress,
+        wfhMode: hasApprovedWFH
       });
     } catch (error) {
       console.error('Error checking in:', error);
@@ -319,10 +355,9 @@ const AttendanceSystem = () => {
       }));
 
       alert('Check-out berhasil!');
-      console.log('Check-out berhasil:', {
+      console.log('✅ Check-out successful:', {
         employeeId: profile.employee_id,
-        time: timeString,
-        location: currentLocation
+        time: timeString
       });
     } catch (error) {
       console.error('Error checking out:', error);
@@ -331,10 +366,20 @@ const AttendanceSystem = () => {
   };
 
   const handleWFHSuccess = () => {
+    console.log('WFH request submitted successfully, refreshing status...');
     // Refresh the approved WFH status
     checkApprovedWFHRequest();
     setShowWFHForm(false);
   };
+
+  // Debug render
+  console.log('AttendanceSystem render state:', {
+    hasApprovedWFH,
+    isWithinGeofence,
+    canAttend,
+    locationError: !!locationError,
+    currentLocation: !!currentLocation
+  });
 
   return (
     <div className="space-y-6">
@@ -400,7 +445,7 @@ const AttendanceSystem = () => {
                     <div>
                       <p className="text-green-800 font-medium">Work From Home Disetujui</p>
                       <p className="text-green-600 text-sm">
-                        Permintaan WFH Anda telah disetujui. Anda dapat melakukan absensi dari lokasi manapun.
+                        Anda dapat melakukan absensi dari lokasi manapun karena permintaan WFH telah disetujui.
                       </p>
                     </div>
                   </div>
@@ -445,7 +490,22 @@ const AttendanceSystem = () => {
             </div>
           )}
 
-          {/* Alternative attendance option when location is denied */}
+          {/* Alternative attendance option when location is denied but has approved WFH */}
+          {locationError && hasApprovedWFH && (
+            <div className="mt-4 p-4 bg-green-50 rounded-lg">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                <div>
+                  <p className="text-green-800 font-medium">Work From Home Aktif</p>
+                  <p className="text-green-600 text-sm">
+                    Meskipun akses lokasi ditolak, Anda dapat melakukan absensi karena memiliki persetujuan WFH.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Alternative attendance option when location is denied and no approved WFH */}
           {locationError && !hasApprovedWFH && (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
               <div className="flex items-center justify-between">
@@ -508,7 +568,7 @@ const AttendanceSystem = () => {
                     </Button>
                     {!canAttend && (
                       <p className="text-xs text-gray-500 mt-2">
-                        {locationError ? 'Izinkan akses lokasi atau ajukan WFH' : 'Berada di luar area kantor'}
+                        {hasApprovedWFH ? 'Memproses status WFH...' : 'Berada di luar area kantor dan tidak ada WFH aktif'}
                       </p>
                     )}
                   </div>
