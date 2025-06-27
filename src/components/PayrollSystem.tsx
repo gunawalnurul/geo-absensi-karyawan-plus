@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, Eye, DollarSign, FileText } from 'lucide-react';
+import { Download, Eye, FileText } from 'lucide-react';
 
 const PayrollSystem = () => {
   const { profile } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState('12');
-  const [selectedYear, setSelectedYear] = useState('2024');
+  const [selectedYear, setSelectedYear] = useState('2025');
   const [selectedEmployee, setSelectedEmployee] = useState('all');
   const [paySlips, setPaySlips] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -188,9 +188,9 @@ Hari Hadir: ${paySlip.attended_days}
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="2025">2025</SelectItem>
                   <SelectItem value="2024">2024</SelectItem>
                   <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -236,7 +236,7 @@ Hari Hadir: ${paySlip.attended_days}
                     {formatCurrency(paySlips.reduce((sum, p) => sum + p.gross_salary, 0))}
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
+                <div className="text-green-500 text-2xl font-bold">Rp</div>
               </div>
             </CardContent>
           </Card>
@@ -250,7 +250,7 @@ Hari Hadir: ${paySlip.attended_days}
                     {formatCurrency(paySlips.reduce((sum, p) => sum + p.tax, 0))}
                   </p>
                 </div>
-                <FileText className="h-8 w-8 text-red-500" />
+                <div className="text-red-500 text-2xl font-bold">Rp</div>
               </div>
             </CardContent>
           </Card>
@@ -264,7 +264,7 @@ Hari Hadir: ${paySlip.attended_days}
                     {formatCurrency(paySlips.reduce((sum, p) => sum + p.social_security, 0))}
                   </p>
                 </div>
-                <Badge className="h-8 w-8 text-blue-500" />
+                <div className="text-blue-500 text-2xl font-bold">Rp</div>
               </div>
             </CardContent>
           </Card>
@@ -278,7 +278,7 @@ Hari Hadir: ${paySlip.attended_days}
                     {formatCurrency(paySlips.reduce((sum, p) => sum + p.net_salary, 0))}
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-green-600" />
+                <div className="text-green-600 text-2xl font-bold">Rp</div>
               </div>
             </CardContent>
           </Card>

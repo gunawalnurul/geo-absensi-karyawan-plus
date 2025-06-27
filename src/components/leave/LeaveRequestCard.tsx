@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, Clock, Check, X } from 'lucide-react';
+import { Calendar, Clock } from 'lucide-react';
+import LeaveApprovalDialog from './LeaveApprovalDialog';
 
 const leaveTypes = [
   { value: 'annual', label: 'Cuti Tahunan' },
@@ -23,11 +23,12 @@ interface LeaveRequest {
   status: string;
   applied_date: string;
   approved_date?: string;
+  rejection_reason?: string;
 }
 
 interface LeaveRequestCardProps {
   request: LeaveRequest;
-  onApproveReject: (id: string, status: 'approved' | 'rejected') => void;
+  onApproveReject: (id: string, status: 'approved' | 'rejected', message?: string) => void;
 }
 
 const LeaveRequestCard = ({ request, onApproveReject }: LeaveRequestCardProps) => {
@@ -49,6 +50,14 @@ const LeaveRequestCard = ({ request, onApproveReject }: LeaveRequestCardProps) =
     return typeObj?.label || type;
   };
 
+  const handleApprove = (message?: string) => {
+    onApproveReject(request.id, 'approved', message);
+  };
+
+  const handleReject = (message: string) => {
+    onApproveReject(request.id, 'rejected', message);
+  };
+
   return (
     <div className="border rounded-lg p-4 hover:bg-gray-50">
       <div className="flex justify-between items-start mb-3">
@@ -59,24 +68,10 @@ const LeaveRequestCard = ({ request, onApproveReject }: LeaveRequestCardProps) =
         <div className="flex items-center space-x-2">
           {getStatusBadge(request.status)}
           {profile?.role === 'admin' && request.status === 'pending' && (
-            <div className="flex space-x-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onApproveReject(request.id, 'approved')}
-                className="text-green-600 hover:text-green-700"
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onApproveReject(request.id, 'rejected')}
-                className="text-red-600 hover:text-red-700"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <LeaveApprovalDialog
+              onApprove={handleApprove}
+              onReject={handleReject}
+            />
           )}
         </div>
       </div>
@@ -104,6 +99,11 @@ const LeaveRequestCard = ({ request, onApproveReject }: LeaveRequestCardProps) =
       {request.status !== 'pending' && request.approved_date && (
         <div className="mt-2 text-xs text-gray-500">
           {request.status === 'approved' ? 'Disetujui' : 'Ditolak'} pada {new Date(request.approved_date).toLocaleDateString('id-ID')}
+          {request.rejection_reason && (
+            <div className="mt-1 p-2 bg-red-50 rounded text-red-700">
+              <span className="font-medium">Alasan penolakan:</span> {request.rejection_reason}
+            </div>
+          )}
         </div>
       )}
     </div>

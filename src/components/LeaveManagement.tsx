@@ -45,15 +45,21 @@ const LeaveManagement = () => {
     }
   };
 
-  const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
+  const handleApproveReject = async (id: string, status: 'approved' | 'rejected', message?: string) => {
     try {
+      const updateData: any = {
+        status,
+        approved_by: profile?.id,
+        approved_date: new Date().toISOString().split('T')[0]
+      };
+
+      if (status === 'rejected' && message) {
+        updateData.rejection_reason = message;
+      }
+
       const { error } = await supabase
         .from('leave_requests')
-        .update({
-          status,
-          approved_by: profile?.id,
-          approved_date: new Date().toISOString().split('T')[0]
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) {
