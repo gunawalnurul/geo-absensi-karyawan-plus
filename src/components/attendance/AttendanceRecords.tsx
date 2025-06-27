@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,18 +51,18 @@ const AttendanceRecords = () => {
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
-    department: '',
-    status: '' as AttendanceStatus | '',
+    department: 'all',
+    status: 'all',
     employee: ''
   });
   const [wfhFilters, setWfhFilters] = useState({
     startDate: '',
     endDate: '',
-    status: '' as 'pending' | 'approved' | 'rejected' | '',
+    status: 'all',
     employee: ''
   });
   const [departments, setDepartments] = useState<string[]>([]);
-  const [selectedWFHRequest, setSelectedWFHRequest] = useState(null);
+  const [selectedWFHRequest, setSelectedWFHRequest] = useState<OutOfTownRequest | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const { toast } = useToast();
 
@@ -106,10 +107,10 @@ const AttendanceRecords = () => {
       if (filters.endDate) {
         query = query.lte('date', filters.endDate);
       }
-      if (filters.status) {
+      if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status as AttendanceStatus);
       }
-      if (filters.department) {
+      if (filters.department && filters.department !== 'all') {
         query = query.eq('profiles.department', filters.department);
       }
       if (filters.employee) {
@@ -146,7 +147,7 @@ const AttendanceRecords = () => {
       if (wfhFilters.endDate) {
         query = query.lte('end_date', wfhFilters.endDate);
       }
-      if (wfhFilters.status) {
+      if (wfhFilters.status && wfhFilters.status !== 'all') {
         query = query.eq('status', wfhFilters.status);
       }
       if (wfhFilters.employee) {
@@ -188,8 +189,8 @@ const AttendanceRecords = () => {
       setFilters({
         startDate: '',
         endDate: '',
-        department: '',
-        status: '' as AttendanceStatus | '',
+        department: 'all',
+        status: 'all',
         employee: ''
       });
       setTimeout(() => {
@@ -199,7 +200,7 @@ const AttendanceRecords = () => {
       setWfhFilters({
         startDate: '',
         endDate: '',
-        status: '' as 'pending' | 'approved' | 'rejected' | '',
+        status: 'all',
         employee: ''
       });
       setTimeout(() => {
@@ -330,7 +331,7 @@ const AttendanceRecords = () => {
                 <SelectValue placeholder="Semua Departemen" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua Departemen</SelectItem>
+                <SelectItem value="all">Semua Departemen</SelectItem>
                 {departments.map(dept => (
                   <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                 ))}
@@ -345,7 +346,7 @@ const AttendanceRecords = () => {
                 <SelectValue placeholder="Semua Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua Status</SelectItem>
+                <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="present">Hadir</SelectItem>
                 <SelectItem value="late">Terlambat</SelectItem>
                 <SelectItem value="absent">Tidak Hadir</SelectItem>
@@ -403,7 +404,7 @@ const AttendanceRecords = () => {
                 <SelectValue placeholder="Semua Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua Status</SelectItem>
+                <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="approved">Disetujui</SelectItem>
                 <SelectItem value="rejected">Ditolak</SelectItem>
@@ -436,13 +437,14 @@ const AttendanceRecords = () => {
     }
   };
 
-  const handleWFHApproval = (request: any) => {
+  const handleWFHApproval = (request: OutOfTownRequest) => {
     setSelectedWFHRequest(request);
     setShowApprovalDialog(true);
   };
 
   const handleApprovalComplete = () => {
     fetchOutOfTownRequests();
+    setSelectedWFHRequest(null);
   };
 
   return (
@@ -600,61 +602,61 @@ const AttendanceRecords = () => {
                   </>
                 ) : (
                   <>
-                    {outOfTownRequests.map((request) => (
-                      <div key={request.id} className="border rounded-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-gray-500" />
-                              <span className="font-medium">{request.employee_name}</span>
-                            </div>
-                            <p className="text-sm text-gray-600">ID: {request.employee_id}</p>
-                          </div>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-blue-500" />
-                              <span className="text-sm font-medium">Periode</span>
-                            </div>
-                            <p className="text-sm">
-                              {new Date(request.start_date).toLocaleDateString('id-ID')} - {new Date(request.end_date).toLocaleDateString('id-ID')}
-                            </p>
-                            <p className="text-xs text-gray-500">{request.duration_days} hari</p>
-                          </div>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-green-500" />
-                              <span className="text-sm font-medium">Tujuan</span>
-                            </div>
-                            <p className="text-sm">{request.destination}</p>
-                            <p className="text-xs text-gray-500">{request.purpose}</p>
-                          </div>
-
-                          <div className="space-y-2">
-                            {getStatusBadge(request.status)}
-                            {profile?.role === 'admin' && request.status === 'pending' && (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleWFHApproval(request)}
-                                  className="flex items-center gap-1"
-                                >
-                                  <CheckCircle className="h-3 w-3" />
-                                  Review
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {outOfTownRequests.length === 0 && (
+                    {outOfTownRequests.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         Tidak ada data work from home ditemukan
                       </div>
+                    ) : (
+                      outOfTownRequests.map((request) => (
+                        <div key={request.id} className="border rounded-lg p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium">{request.employee_name}</span>
+                              </div>
+                              <p className="text-sm text-gray-600">ID: {request.employee_id}</p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-blue-500" />
+                                <span className="text-sm font-medium">Periode</span>
+                              </div>
+                              <p className="text-sm">
+                                {new Date(request.start_date).toLocaleDateString('id-ID')} - {new Date(request.end_date).toLocaleDateString('id-ID')}
+                              </p>
+                              <p className="text-xs text-gray-500">{request.duration_days} hari</p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-green-500" />
+                                <span className="text-sm font-medium">Tujuan</span>
+                              </div>
+                              <p className="text-sm">{request.destination}</p>
+                              <p className="text-xs text-gray-500">{request.purpose}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                              {getStatusBadge(request.status)}
+                              {profile?.role === 'admin' && request.status === 'pending' && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleWFHApproval(request)}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                    Review
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </>
                 )}
@@ -668,7 +670,10 @@ const AttendanceRecords = () => {
       <WFHApprovalDialog
         request={selectedWFHRequest}
         isOpen={showApprovalDialog}
-        onClose={() => setShowApprovalDialog(false)}
+        onClose={() => {
+          setShowApprovalDialog(false);
+          setSelectedWFHRequest(null);
+        }}
         onApproval={handleApprovalComplete}
       />
     </div>
