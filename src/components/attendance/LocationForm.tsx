@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Navigation } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import LocationMap from './LocationMap';
+import LocationMapOSM from './LocationMapOSM';
 
 interface LocationFormProps {
   onAddLocation: (locationData: {
@@ -180,7 +180,7 @@ const LocationForm = ({ onAddLocation }: LocationFormProps) => {
                   placeholder="100"
                 />
               </div>
-              <LocationMap onLocationSelect={handleMapLocationSelect} />
+              <LocationMapOSM onLocationSelect={handleMapLocationSelect} />
             </div>
           </TabsContent>
         </Tabs>

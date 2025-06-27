@@ -95,6 +95,10 @@ const WFHRequestForm = ({ onClose, onSuccess }: WFHRequestFormProps) => {
     }
   };
 
+  // Get today's date at start of day for comparison
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader>
@@ -126,7 +130,7 @@ const WFHRequestForm = ({ onClose, onSuccess }: WFHRequestFormProps) => {
                     mode="single"
                     selected={formData.startDate || undefined}
                     onSelect={(date) => setFormData(prev => ({ ...prev, startDate: date || null }))}
-                    disabled={(date) => date < new Date()}
+                    disabled={(date) => date < today}
                     initialFocus
                   />
                 </PopoverContent>
@@ -153,7 +157,10 @@ const WFHRequestForm = ({ onClose, onSuccess }: WFHRequestFormProps) => {
                     mode="single"
                     selected={formData.endDate || undefined}
                     onSelect={(date) => setFormData(prev => ({ ...prev, endDate: date || null }))}
-                    disabled={(date) => date < (formData.startDate || new Date())}
+                    disabled={(date) => {
+                      const minDate = formData.startDate || today;
+                      return date < minDate;
+                    }}
                     initialFocus
                   />
                 </PopoverContent>
