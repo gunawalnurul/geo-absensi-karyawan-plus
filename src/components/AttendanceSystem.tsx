@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,9 +39,9 @@ const AttendanceSystem = () => {
   }, [currentLocation, geofenceLocations]);
 
   useEffect(() => {
-    // Update attendance capability - allow attendance if within geofence OR has approved WFH
+    // FIXED: Simplified attendance capability logic
     const newCanAttend = isWithinGeofence || hasApprovedWFH;
-    console.log('Updating canAttend:', { 
+    console.log('🔄 Updating canAttend:', { 
       isWithinGeofence, 
       hasApprovedWFH, 
       newCanAttend,
@@ -50,7 +49,7 @@ const AttendanceSystem = () => {
       currentLocation: !!currentLocation
     });
     setCanAttend(newCanAttend);
-  }, [isWithinGeofence, hasApprovedWFH, locationError, currentLocation]);
+  }, [isWithinGeofence, hasApprovedWFH]);
 
   const checkApprovedWFHRequest = async () => {
     if (!profile?.employee_id) {
@@ -68,7 +67,6 @@ const AttendanceSystem = () => {
         profile: profile
       });
       
-      // Check both out_of_town_requests table
       const { data, error } = await supabase
         .from('out_of_town_requests')
         .select('*')
@@ -90,6 +88,9 @@ const AttendanceSystem = () => {
       });
       
       const hasApproved = data && data.length > 0;
+      
+      // FIXED: Force state update with explicit logging
+      console.log('🔄 Setting hasApprovedWFH to:', hasApproved);
       setHasApprovedWFH(hasApproved);
       
       if (hasApproved) {
@@ -103,16 +104,6 @@ const AttendanceSystem = () => {
         });
       } else {
         console.log('❌ No approved WFH found for today');
-        
-        // Let's also check what WFH requests exist for this employee
-        const { data: allRequests } = await supabase
-          .from('out_of_town_requests')
-          .select('*')
-          .eq('employee_id', profile.employee_id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-          
-        console.log('📋 All WFH requests for employee:', allRequests);
       }
     } catch (error) {
       console.error('❌ Exception in checkApprovedWFHRequest:', error);
@@ -263,7 +254,7 @@ const AttendanceSystem = () => {
   };
 
   const handleCheckIn = async () => {
-    console.log('🔍 Check-in attempt with debug info:', {
+    console.log('🔍 Check-in attempt with current state:', {
       isWithinGeofence,
       hasApprovedWFH,
       canAttend,
@@ -273,11 +264,9 @@ const AttendanceSystem = () => {
       attendanceStatus
     });
 
-    // Allow check-in if within geofence OR has approved WFH (even without location)
+    // FIXED: Clear logic for attendance eligibility
     if (!canAttend) {
-      const message = hasApprovedWFH 
-        ? 'Sistem sedang memproses status WFH Anda. Silakan coba lagi dalam beberapa detik.'
-        : 'Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.';
+      const message = 'Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.';
       alert(message);
       return;
     }
@@ -291,14 +280,12 @@ const AttendanceSystem = () => {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
-      // Determine location info based on attendance type
       let locationAddress = '';
       let lat = null;
       let lng = null;
       
       if (hasApprovedWFH) {
         locationAddress = 'Work From Home/Anywhere';
-        // Don't require location for WFH
         lat = currentLocation?.lat || null;
         lng = currentLocation?.lng || null;
       } else if (nearestLocation && isWithinGeofence) {
