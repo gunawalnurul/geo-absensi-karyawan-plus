@@ -148,7 +148,9 @@ const AttendanceRecords = () => {
         query = query.lte('end_date', wfhFilters.endDate);
       }
       if (wfhFilters.status && wfhFilters.status !== 'all') {
-        query = query.eq('status', wfhFilters.status);
+        // Type assertion to ensure the status is one of the valid values
+        const validStatus = wfhFilters.status as 'pending' | 'approved' | 'rejected';
+        query = query.eq('status', validStatus);
       }
       if (wfhFilters.employee) {
         query = query.ilike('employee_name', `%${wfhFilters.employee}%`);
