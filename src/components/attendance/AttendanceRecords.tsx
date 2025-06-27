@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, Download, Filter, MapPin, User, Home } from 'lucide-react';
+import { Calendar, Clock, Download, Filter, MapPin, User, Home, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import WFHApprovalDialog from './WFHApprovalDialog';
 
 interface AttendanceRecord {
   id: string;
@@ -40,6 +42,7 @@ interface OutOfTownRequest {
 type AttendanceStatus = 'present' | 'late' | 'absent';
 
 const AttendanceRecords = () => {
+  const { profile } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [outOfTownRequests, setOutOfTownRequests] = useState<OutOfTownRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,8 @@ const AttendanceRecords = () => {
     employee: ''
   });
   const [departments, setDepartments] = useState<string[]>([]);
+  const [selectedWFHRequest, setSelectedWFHRequest] = useState(null);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -431,6 +436,15 @@ const AttendanceRecords = () => {
     }
   };
 
+  const handleWFHApproval = (request: any) => {
+    setSelectedWFHRequest(request);
+    setShowApprovalDialog(true);
+  };
+
+  const handleApprovalComplete = () => {
+    fetchOutOfTownRequests();
+  };
+
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
@@ -619,6 +633,19 @@ const AttendanceRecords = () => {
 
                           <div className="space-y-2">
                             {getStatusBadge(request.status)}
+                            {profile?.role === 'admin' && request.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleWFHApproval(request)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <CheckCircle className="h-3 w-3" />
+                                  Review
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -636,6 +663,14 @@ const AttendanceRecords = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* WFH Approval Dialog */}
+      <WFHApprovalDialog
+        request={selectedWFHRequest}
+        isOpen={showApprovalDialog}
+        onClose={() => setShowApprovalDialog(false)}
+        onApproval={handleApprovalComplete}
+      />
     </div>
   );
 };

@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+// @ts-ignore
+import * as LControlGeocoder from 'leaflet-control-geocoder';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
 
@@ -23,6 +25,7 @@ const LocationMapOSM = ({ onLocationSelect, initialLat, initialLng }: LocationMa
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const marker = useRef<L.Marker | null>(null);
+  const geocoder = useRef<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(
     initialLat && initialLng ? { lat: initialLat, lng: initialLng } : null
   );
@@ -39,6 +42,26 @@ const LocationMapOSM = ({ onLocationSelect, initialLat, initialLng }: LocationMa
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map.current);
+
+    // Add geocoder control for search functionality
+    geocoder.current = LControlGeocoder.geocoder({
+      defaultMarkGeocode: false
+    }).on('markgeocode', function(e: any) {
+      const latlng = e.geocode.center;
+      const address = e.geocode.name;
+      
+      // Remove existing marker
+      if (marker.current) {
+        map.current?.removeLayer(marker.current);
+      }
+      
+      // Add new marker
+      marker.current = L.marker([latlng.lat, latlng.lng]).addTo(map.current!);
+      map.current?.setView([latlng.lat, latlng.lng], 16);
+      
+      setSelectedLocation({ lat: latlng.lat, lng: latlng.lng });
+      onLocationSelect(latlng.lat, latlng.lng, address);
     }).addTo(map.current);
 
     // Add click event to map
@@ -127,7 +150,7 @@ const LocationMapOSM = ({ onLocationSelect, initialLat, initialLng }: LocationMa
             <strong>Lokasi Terpilih:</strong> {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Klik pada peta untuk memilih lokasi yang berbeda
+            Klik pada peta atau gunakan search box untuk memilih lokasi yang berbeda
           </p>
         </div>
       )}

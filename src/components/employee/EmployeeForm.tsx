@@ -1,276 +1,279 @@
 
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Employee, CreateEmployeeData, UpdateEmployeeData } from '@/hooks/useEmployees';
+import { X, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAutoEmployeeId } from '../../hooks/useAutoEmployeeId';
 
-const employeeSchema = z.object({
-  employee_id: z.string().min(1, 'Employee ID is required'),
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email address'),
-  department: z.string().min(1, 'Department is required'),
-  position: z.string().min(1, 'Position is required'),
-  salary: z.number().min(0, 'Salary must be positive'),
-  role: z.enum(['admin', 'employee']),
-  is_out_of_town: z.boolean().optional()
-});
-
-type EmployeeFormData = z.infer<typeof employeeSchema>;
-
-interface EmployeeFormProps {
-  employee?: Employee;
-  onSubmit: (data: CreateEmployeeData | UpdateEmployeeData) => Promise<void>;
-  onCancel: () => void;
-  loading?: boolean;
+interface Employee {
+  id?: string;
+  employee_id: string;
+  name: string;
+  email: string;
+  department: string;
+  position: string;
+  salary: number;
+  role: 'admin' | 'employee';
+  join_date: string;
 }
 
-const EmployeeForm: React.FC<EmployeeFormProps> = ({
-  employee,
-  onSubmit,
-  onCancel,
-  loading = false
-}) => {
-  const form = useForm<EmployeeFormData>({
-    resolver: zodResolver(employeeSchema),
-    defaultValues: {
-      employee_id: employee?.employee_id || '',
-      name: employee?.name || '',
-      email: employee?.email || '',
-      department: employee?.department || '',
-      position: employee?.position || '',
-      salary: employee?.salary || 0,
-      role: employee?.role || 'employee',
-      is_out_of_town: employee?.is_out_of_town || false
-    }
-  });
+interface EmployeeFormProps {
+  employee?: Employee | null;
+  onSubmit: (employee: Omit<Employee, 'id'>) => Promise<void>;
+  onCancel: () => void;
+}
 
-  const handleSubmit = async (data: EmployeeFormData) => {
+const EmployeeForm = ({ employee, onSubmit, onCancel }: EmployeeFormProps) => {
+  const { nextEmployeeId, loading: idLoading, generateNextEmployeeId, checkEmployeeIdExists } = useAutoEmployeeId();
+  const [formData, setFormData] = useState<Omit<Employee, 'id'>>({
+    employee_id: '',
+    name: '',
+    email: '',
+    department: '',
+    position: '',
+    salary: 5000000,
+    role: 'employee',
+    join_date: new Date().toISOString().split('T')[0]
+  });
+  const [loading, setLoading] = useState(false);
+  const [employeeIdError, setEmployeeIdError] = useState('');
+  const { toast } = useToast();
+
+  useEffect(() => {
     if (employee) {
-      // Update mode - exclude fields that shouldn't be updated
-      const { employee_id, email, ...updateData } = data;
-      await onSubmit(updateData);
-    } else {
-      // Create mode - include all fields
-      await onSubmit(data);
+      setFormData({
+        employee_id: employee.employee_id,
+        name: employee.name,
+        email: employee.email,
+        department: employee.department,
+        position: employee.position,
+        salary: employee.salary,
+        role: employee.role,
+        join_date: employee.join_date
+      });
+    } else if (nextEmployeeId && !employee) {
+      // Auto-fill employee_id for new employee
+      setFormData(prev => ({
+        ...prev,
+        employee_id: nextEmployeeId
+      }));
+    }
+  }, [employee, nextEmployeeId]);
+
+  const handleEmployeeIdChange = async (value: string) => {
+    setFormData(prev => ({ ...prev, employee_id: value }));
+    setEmployeeIdError('');
+
+    // Check if employee ID already exists (for new employees only)
+    if (!employee && value.trim()) {
+      const exists = await checkEmployeeIdExists(value.trim());
+      if (exists) {
+        setEmployeeIdError('Employee ID sudah digunakan');
+      }
+    }
+  };
+
+  const handleRefreshEmployeeId = async () => {
+    if (!employee) {
+      await generateNextEmployeeId();
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (employeeIdError) {
+      toast({
+        title: 'Error',
+        description: 'Perbaiki error pada form sebelum submit',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast({
+        title: 'Error',
+        description: 'Gagal menyimpan data karyawan',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const departments = [
-    'IT',
-    'HR',
-    'Finance',
-    'Marketing',
-    'Operations',
-    'Sales',
-    'General'
+    'IT', 'HR', 'Finance', 'Marketing', 'Operations', 'Sales', 'General'
   ];
 
   const positions = [
-    'Manager',
-    'Senior Developer',
-    'Developer',
-    'Analyst',
-    'Coordinator',
-    'Specialist',
-    'Assistant',
-    'Employee'
+    'Manager', 'Senior Developer', 'Developer', 'Junior Developer', 
+    'HR Specialist', 'Accountant', 'Marketing Specialist', 'Admin'
   ];
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>
-          {employee ? 'Edit Employee' : 'Add New Employee'}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>
+            {employee ? 'Edit Karyawan' : 'Tambah Karyawan Baru'}
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="employee_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Employee ID</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        disabled={!!employee || loading}
-                        placeholder="EMP001"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="employee_id">Employee ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="employee_id"
+                  value={formData.employee_id}
+                  onChange={(e) => handleEmployeeIdChange(e.target.value)}
+                  placeholder="EMP001"
+                  required
+                  className={employeeIdError ? 'border-red-500' : ''}
+                  disabled={idLoading}
+                />
+                {!employee && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshEmployeeId}
+                    disabled={idLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${idLoading ? 'animate-spin' : ''}`} />
+                  </Button>
                 )}
-              />
+              </div>
+              {employeeIdError && (
+                <p className="text-sm text-red-500">{employeeIdError}</p>
+              )}
+              {!employee && (
+                <p className="text-xs text-gray-500">
+                  ID akan dibuat otomatis berdasarkan urutan terakhir
+                </p>
+              )}
+            </div>
 
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        disabled={loading}
-                        placeholder="John Doe"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="email"
-                        disabled={!!employee || loading}
-                        placeholder="john.doe@company.com"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="department"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Department</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="position"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Position</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select position" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {positions.map((pos) => (
-                          <SelectItem key={pos} value={pos}>
-                            {pos}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="salary"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Salary (IDR)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field}
-                        type="number"
-                        disabled={loading}
-                        placeholder="5000000"
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="employee">Employee</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="is_out_of_town"
-                render={({ field }) => (
-                  <FormItem className="flex items-center space-x-2">
-                    <FormLabel>Out of Town Access</FormLabel>
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={field.onChange}
-                        disabled={loading}
-                        className="rounded border-gray-300"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="name">Nama Lengkap</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="John Doe"
+                required
               />
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? 'Saving...' : (employee ? 'Update Employee' : 'Add Employee')}
-              </Button>
-              <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-                Cancel
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="john@example.com"
+                required
+              />
             </div>
-          </form>
-        </Form>
+
+            <div className="space-y-2">
+              <Label htmlFor="department">Departemen</Label>
+              <Select
+                value={formData.department}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Departemen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="position">Posisi</Label>
+              <Select
+                value={formData.position}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, position: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Posisi" />
+                </SelectTrigger>
+                <SelectContent>
+                  {positions.map(pos => (
+                    <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salary">Gaji</Label>
+              <Input
+                id="salary"
+                type="number"
+                value={formData.salary}
+                onChange={(e) => setFormData(prev => ({ ...prev, salary: parseInt(e.target.value) || 0 }))}
+                placeholder="5000000"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value: 'admin' | 'employee') => setFormData(prev => ({ ...prev, role: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="join_date">Tanggal Bergabung</Label>
+              <Input
+                id="join_date"
+                type="date"
+                value={formData.join_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, join_date: e.target.value }))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Batal
+            </Button>
+            <Button type="submit" disabled={loading || !!employeeIdError}>
+              {loading ? 'Menyimpan...' : employee ? 'Update' : 'Simpan'}
+            </Button>
+          </div>
+        </form>
       </CardContent>
     </Card>
   );
