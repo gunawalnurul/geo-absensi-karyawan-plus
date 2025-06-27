@@ -40,14 +40,21 @@ const AttendanceSystem = () => {
   }, [currentLocation, geofenceLocations]);
 
   useEffect(() => {
-    // Update attendance capability when WFH status or geofence status changes
-    console.log('Updating canAttend:', { isWithinGeofence, hasApprovedWFH });
-    setCanAttend(isWithinGeofence || hasApprovedWFH);
-  }, [isWithinGeofence, hasApprovedWFH]);
+    // Update attendance capability - allow attendance if within geofence OR has approved WFH
+    const newCanAttend = isWithinGeofence || hasApprovedWFH;
+    console.log('Updating canAttend:', { 
+      isWithinGeofence, 
+      hasApprovedWFH, 
+      newCanAttend,
+      locationError: !!locationError,
+      currentLocation: !!currentLocation
+    });
+    setCanAttend(newCanAttend);
+  }, [isWithinGeofence, hasApprovedWFH, locationError, currentLocation]);
 
   const checkApprovedWFHRequest = async () => {
     if (!profile?.employee_id) {
-      console.log('No employee_id found in profile');
+      console.log('❌ No employee_id found in profile:', profile);
       return;
     }
 
@@ -55,11 +62,13 @@ const AttendanceSystem = () => {
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
       
-      console.log('Checking WFH request for:', {
+      console.log('🔍 Checking WFH request for:', {
         employee_id: profile.employee_id,
-        date: todayString
+        date: todayString,
+        profile: profile
       });
       
+      // Check both out_of_town_requests table
       const { data, error } = await supabase
         .from('out_of_town_requests')
         .select('*')
@@ -69,14 +78,15 @@ const AttendanceSystem = () => {
         .gte('end_date', todayString);
 
       if (error) {
-        console.error('Error checking WFH request:', error);
+        console.error('❌ Error checking WFH request:', error);
         return;
       }
 
-      console.log('WFH request query result:', {
+      console.log('📊 WFH request query result:', {
         data,
         count: data?.length,
-        hasApproved: data && data.length > 0
+        hasApproved: data && data.length > 0,
+        query: `employee_id=${profile.employee_id}, status=approved, start_date<=${todayString}, end_date>=${todayString}`
       });
       
       const hasApproved = data && data.length > 0;
@@ -84,11 +94,28 @@ const AttendanceSystem = () => {
       
       if (hasApproved) {
         console.log('✅ Approved WFH found:', data[0]);
+        console.log('📝 WFH Details:', {
+          id: data[0].id,
+          start_date: data[0].start_date,
+          end_date: data[0].end_date,
+          status: data[0].status,
+          employee_id: data[0].employee_id
+        });
       } else {
         console.log('❌ No approved WFH found for today');
+        
+        // Let's also check what WFH requests exist for this employee
+        const { data: allRequests } = await supabase
+          .from('out_of_town_requests')
+          .select('*')
+          .eq('employee_id', profile.employee_id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        console.log('📋 All WFH requests for employee:', allRequests);
       }
     } catch (error) {
-      console.error('Error checking WFH request:', error);
+      console.error('❌ Exception in checkApprovedWFHRequest:', error);
     }
   };
 
@@ -104,7 +131,7 @@ const AttendanceSystem = () => {
         return;
       }
 
-      console.log('Geofence locations fetched:', data?.length);
+      console.log('📍 Geofence locations fetched:', data?.length);
       setGeofenceLocations(data || []);
     } catch (error) {
       console.error('Error fetching geofence locations:', error);
@@ -151,24 +178,24 @@ const AttendanceSystem = () => {
           };
           setCurrentLocation(coords);
           setLocationError('');
-          console.log('Location obtained successfully:', coords);
+          console.log('📍 Location obtained successfully:', coords);
         },
         (error) => {
-          console.error('Geolocation error:', error);
+          console.error('🌍 Geolocation error:', error);
           let errorMessage = '';
           
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Akses lokasi ditolak. Jika Anda memiliki persetujuan Work From Home, Anda tetap dapat melakukan absensi.';
+              errorMessage = 'Akses lokasi ditolak. Pastikan Anda memiliki persetujuan Work From Home untuk dapat melakukan absensi.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau gunakan fitur Work From Home.';
+              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau ajukan Work From Home.';
               break;
             case error.TIMEOUT:
-              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau gunakan Work From Home.';
+              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau ajukan Work From Home.';
               break;
             default:
-              errorMessage = 'Terjadi error dalam mengambil lokasi. Gunakan Work From Home jika diperlukan.';
+              errorMessage = 'Terjadi error dalam mengambil lokasi. Ajukan Work From Home jika diperlukan.';
               break;
           }
           
@@ -210,7 +237,7 @@ const AttendanceSystem = () => {
       }
     });
 
-    console.log('Geofence check result:', {
+    console.log('🎯 Geofence check result:', {
       withinAnyGeofence,
       closestDistance: closestLocation?.distance,
       closestLocation: closestLocation?.name
@@ -236,16 +263,22 @@ const AttendanceSystem = () => {
   };
 
   const handleCheckIn = async () => {
-    console.log('Check-in attempt:', {
+    console.log('🔍 Check-in attempt with debug info:', {
       isWithinGeofence,
       hasApprovedWFH,
       canAttend,
-      currentLocation,
-      profile: profile?.employee_id
+      currentLocation: !!currentLocation,
+      locationError: !!locationError,
+      employeeId: profile?.employee_id,
+      attendanceStatus
     });
 
+    // Allow check-in if within geofence OR has approved WFH (even without location)
     if (!canAttend) {
-      alert('Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.');
+      const message = hasApprovedWFH 
+        ? 'Sistem sedang memproses status WFH Anda. Silakan coba lagi dalam beberapa detik.'
+        : 'Anda tidak dapat melakukan absensi. Pastikan berada dalam area kantor atau memiliki persetujuan Work From Home yang aktif.';
+      alert(message);
       return;
     }
 
@@ -260,13 +293,32 @@ const AttendanceSystem = () => {
       
       // Determine location info based on attendance type
       let locationAddress = '';
+      let lat = null;
+      let lng = null;
+      
       if (hasApprovedWFH) {
         locationAddress = 'Work From Home/Anywhere';
-      } else if (nearestLocation) {
+        // Don't require location for WFH
+        lat = currentLocation?.lat || null;
+        lng = currentLocation?.lng || null;
+      } else if (nearestLocation && isWithinGeofence) {
         locationAddress = nearestLocation.name;
+        lat = currentLocation?.lat;
+        lng = currentLocation?.lng;
       } else {
         locationAddress = 'Lokasi Remote';
+        lat = currentLocation?.lat || null;
+        lng = currentLocation?.lng || null;
       }
+      
+      console.log('💾 Saving attendance:', {
+        employee_id: profile.employee_id,
+        date: today,
+        location_address: locationAddress,
+        is_out_of_town_access: hasApprovedWFH,
+        lat,
+        lng
+      });
       
       const { error } = await supabase
         .from('attendance')
@@ -274,8 +326,8 @@ const AttendanceSystem = () => {
           employee_id: profile.employee_id,
           date: today,
           check_in: now.toISOString(),
-          location_lat: currentLocation?.lat || null,
-          location_lng: currentLocation?.lng || null,
+          location_lat: lat,
+          location_lng: lng,
           location_address: locationAddress,
           is_out_of_town_access: hasApprovedWFH,
           status: 'present'
@@ -284,7 +336,7 @@ const AttendanceSystem = () => {
         });
 
       if (error) {
-        console.error('Error checking in:', error);
+        console.error('❌ Error checking in:', error);
         alert('Gagal melakukan check-in. Silakan coba lagi.');
         return;
       }
@@ -304,12 +356,12 @@ const AttendanceSystem = () => {
       console.log('✅ Check-in successful:', {
         employeeId: profile.employee_id,
         time: timeString,
-        location: currentLocation,
+        location: { lat, lng },
         address: locationAddress,
         wfhMode: hasApprovedWFH
       });
     } catch (error) {
-      console.error('Error checking in:', error);
+      console.error('❌ Exception in handleCheckIn:', error);
       alert('Gagal melakukan check-in. Silakan coba lagi.');
     }
   };
@@ -366,19 +418,22 @@ const AttendanceSystem = () => {
   };
 
   const handleWFHSuccess = () => {
-    console.log('WFH request submitted successfully, refreshing status...');
-    // Refresh the approved WFH status
-    checkApprovedWFHRequest();
+    console.log('📝 WFH request submitted successfully, refreshing status...');
+    // Add a small delay to ensure the database is updated
+    setTimeout(() => {
+      checkApprovedWFHRequest();
+    }, 1000);
     setShowWFHForm(false);
   };
 
   // Debug render
-  console.log('AttendanceSystem render state:', {
+  console.log('🖥️ AttendanceSystem render state:', {
     hasApprovedWFH,
     isWithinGeofence,
     canAttend,
     locationError: !!locationError,
-    currentLocation: !!currentLocation
+    currentLocation: !!currentLocation,
+    profile: profile?.employee_id
   });
 
   return (
@@ -393,20 +448,68 @@ const AttendanceSystem = () => {
         </CardHeader>
         <CardContent>
           {locationError ? (
-            <div className="flex items-center p-4 bg-red-50 rounded-lg">
-              <XCircle className="h-5 w-5 text-red-500 mr-3" />
-              <div className="flex-1">
-                <p className="text-red-800 font-medium">Error Lokasi</p>
-                <p className="text-red-600 text-sm">{locationError}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={getCurrentLocation}
-                  className="mt-2"
-                >
-                  Coba Lagi
-                </Button>
+            <div className="space-y-4">
+              <div className="flex items-center p-4 bg-red-50 rounded-lg">
+                <XCircle className="h-5 w-5 text-red-500 mr-3" />
+                <div className="flex-1">
+                  <p className="text-red-800 font-medium">Error Lokasi</p>
+                  <p className="text-red-600 text-sm">{locationError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={getCurrentLocation}
+                    className="mt-2"
+                  >
+                    Coba Lagi
+                  </Button>
+                </div>
               </div>
+
+              {/* Show WFH status even when location is denied */}
+              {hasApprovedWFH && (
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    <div>
+                      <p className="text-green-800 font-medium">Work From Home Disetujui</p>
+                      <p className="text-green-600 text-sm">
+                        Anda dapat melakukan absensi meskipun akses lokasi ditolak karena memiliki persetujuan WFH.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WFH Request Option when no location and no approved WFH */}
+              {!hasApprovedWFH && (
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
+                      <div>
+                        <p className="text-yellow-800 font-medium">Akses Lokasi Ditolak</p>
+                        <p className="text-yellow-600 text-sm">
+                          Untuk dapat absensi tanpa akses lokasi, silakan ajukan Work From Home
+                        </p>
+                      </div>
+                    </div>
+                    <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Home className="h-4 w-4 mr-2" />
+                          Ajukan WFH
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <WFHRequestForm 
+                          onClose={() => setShowWFHForm(false)}
+                          onSuccess={handleWFHSuccess}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              )}
             </div>
           ) : currentLocation ? (
             <div className="space-y-4">
@@ -489,52 +592,6 @@ const AttendanceSystem = () => {
               <p className="text-gray-600">Mengambil lokasi...</p>
             </div>
           )}
-
-          {/* Alternative attendance option when location is denied but has approved WFH */}
-          {locationError && hasApprovedWFH && (
-            <div className="mt-4 p-4 bg-green-50 rounded-lg">
-              <div className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
-                <div>
-                  <p className="text-green-800 font-medium">Work From Home Aktif</p>
-                  <p className="text-green-600 text-sm">
-                    Meskipun akses lokasi ditolak, Anda dapat melakukan absensi karena memiliki persetujuan WFH.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Alternative attendance option when location is denied and no approved WFH */}
-          {locationError && !hasApprovedWFH && (
-            <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
-                  <div>
-                    <p className="text-yellow-800 font-medium">Akses Lokasi Ditolak</p>
-                    <p className="text-yellow-600 text-sm">
-                      Untuk dapat absensi tanpa akses lokasi, silakan ajukan Work From Home
-                    </p>
-                  </div>
-                </div>
-                <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Home className="h-4 w-4 mr-2" />
-                      Ajukan WFH
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <WFHRequestForm 
-                      onClose={() => setShowWFHForm(false)}
-                      onSuccess={handleWFHSuccess}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -568,7 +625,10 @@ const AttendanceSystem = () => {
                     </Button>
                     {!canAttend && (
                       <p className="text-xs text-gray-500 mt-2">
-                        {hasApprovedWFH ? 'Memproses status WFH...' : 'Berada di luar area kantor dan tidak ada WFH aktif'}
+                        {hasApprovedWFH 
+                          ? 'Memproses status WFH...' 
+                          : 'Berada di luar area kantor dan tidak ada WFH aktif'
+                        }
                       </p>
                     )}
                   </div>
