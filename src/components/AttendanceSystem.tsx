@@ -13,6 +13,7 @@ const AttendanceSystem = () => {
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState<string>('');
   const [isWithinGeofence, setIsWithinGeofence] = useState(false);
+  const [hasApprovedWFH, setHasApprovedWFH] = useState(false);
   const [nearestLocation, setNearestLocation] = useState<any>(null);
   const [geofenceLocations, setGeofenceLocations] = useState<any[]>([]);
   const [showWFHForm, setShowWFHForm] = useState(false);
@@ -27,6 +28,7 @@ const AttendanceSystem = () => {
     getCurrentLocation();
     fetchGeofenceLocations();
     checkTodayAttendance();
+    checkApprovedWFHRequest();
   }, []);
 
   useEffect(() => {
@@ -34,6 +36,30 @@ const AttendanceSystem = () => {
       checkGeofenceStatus();
     }
   }, [currentLocation, geofenceLocations]);
+
+  const checkApprovedWFHRequest = async () => {
+    if (!profile?.employee_id) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('out_of_town_requests')
+        .select('*')
+        .eq('employee_id', profile.employee_id)
+        .eq('status', 'approved')
+        .lte('start_date', today)
+        .gte('end_date', today);
+
+      if (error) {
+        console.error('Error checking WFH request:', error);
+        return;
+      }
+
+      setHasApprovedWFH(data && data.length > 0);
+    } catch (error) {
+      console.error('Error checking WFH request:', error);
+    }
+  };
 
   const fetchGeofenceLocations = async () => {
     try {
@@ -129,7 +155,8 @@ const AttendanceSystem = () => {
     });
 
     setNearestLocation(closestLocation);
-    setIsWithinGeofence(withinAnyGeofence || profile?.is_out_of_town || false);
+    // Allow attendance if within geofence, has permanent out-of-town access, or has approved WFH request
+    setIsWithinGeofence(withinAnyGeofence || profile?.is_out_of_town || hasApprovedWFH || false);
   };
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -148,8 +175,8 @@ const AttendanceSystem = () => {
   };
 
   const handleCheckIn = async () => {
-    if (!isWithinGeofence && !profile?.is_out_of_town) {
-      alert('Anda berada di luar area kantor. Silakan mendekat ke kantor untuk melakukan absensi.');
+    if (!isWithinGeofence && !profile?.is_out_of_town && !hasApprovedWFH) {
+      alert('Anda berada di luar area kantor. Silakan mendekat ke kantor atau ajukan permintaan Work From Home untuk melakukan absensi.');
       return;
     }
 
@@ -170,8 +197,8 @@ const AttendanceSystem = () => {
           check_in: now.toISOString(),
           location_lat: currentLocation?.lat,
           location_lng: currentLocation?.lng,
-          location_address: nearestLocation?.name || 'Lokasi Remote',
-          is_out_of_town_access: profile.is_out_of_town,
+          location_address: nearestLocation?.name || (hasApprovedWFH ? 'Work From Home' : 'Lokasi Remote'),
+          is_out_of_town_access: profile.is_out_of_town || hasApprovedWFH,
           status: 'present'
         });
 
@@ -196,7 +223,7 @@ const AttendanceSystem = () => {
         employeeId: profile.employee_id,
         time: timeString,
         location: currentLocation,
-        address: nearestLocation?.name || 'Lokasi Remote'
+        address: nearestLocation?.name || (hasApprovedWFH ? 'Work From Home' : 'Lokasi Remote')
       });
     } catch (error) {
       console.error('Error checking in:', error);
@@ -257,6 +284,7 @@ const AttendanceSystem = () => {
 
   const handleWFHSuccess = () => {
     // Refresh the page or update state as needed
+    checkApprovedWFHRequest();
     window.location.reload();
   };
 
@@ -328,8 +356,22 @@ const AttendanceSystem = () => {
                 </div>
               )}
 
+              {hasApprovedWFH && (
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    <div>
+                      <p className="text-green-800 font-medium">Work From Home Disetujui</p>
+                      <p className="text-green-600 text-sm">
+                        Permintaan WFH Anda telah disetujui. Anda dapat melakukan absensi dari lokasi manapun.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* WFH Request Option */}
-              {!isWithinGeofence && !profile?.is_out_of_town && (
+              {!isWithinGeofence && !profile?.is_out_of_town && !hasApprovedWFH && (
                 <div className="p-4 bg-orange-50 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -391,7 +433,7 @@ const AttendanceSystem = () => {
                     <p className="text-gray-600">Belum Check In</p>
                     <Button 
                       onClick={handleCheckIn}
-                      disabled={!currentLocation || (!isWithinGeofence && !profile?.is_out_of_town)}
+                      disabled={!currentLocation || (!isWithinGeofence && !profile?.is_out_of_town && !hasApprovedWFH)}
                       className="mt-3 bg-green-600 hover:bg-green-700"
                     >
                       Check In Sekarang
