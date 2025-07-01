@@ -67,13 +67,41 @@ const AttendanceSystem = () => {
         profile: profile
       });
       
-      const { data, error } = await supabase
+      // First try exact date match
+      let { data, error } = await supabase
         .from('out_of_town_requests')
         .select('*')
         .eq('employee_id', profile.employee_id)
         .eq('status', 'approved')
         .lte('start_date', todayString)
         .gte('end_date', todayString);
+
+      // If no exact match and location is denied, check for any approved WFH within a reasonable range
+      if ((!data || data.length === 0) && locationError) {
+        console.log('🔄 No exact date match found, checking for any approved WFH requests...');
+        const { data: alternativeData, error: altError } = await supabase
+          .from('out_of_town_requests')
+          .select('*')
+          .eq('employee_id', profile.employee_id)
+          .eq('status', 'approved')
+          .order('start_date', { ascending: false })
+          .limit(5);
+        
+        if (!altError && alternativeData && alternativeData.length > 0) {
+          console.log('📋 Found approved WFH requests:', alternativeData);
+          // Allow WFH if there's any recent approved request (within 3 days)
+          const recentApproval = alternativeData.find(req => {
+            const startDate = new Date(req.start_date);
+            const daysDiff = Math.abs((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysDiff <= 3;
+          });
+          
+          if (recentApproval) {
+            data = [recentApproval];
+            console.log('✅ Using recent WFH approval due to location access denial:', recentApproval);
+          }
+        }
+      }
 
       if (error) {
         console.error('❌ Error checking WFH request:', error);
