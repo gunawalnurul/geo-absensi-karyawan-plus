@@ -13,6 +13,7 @@ interface LocationStatusCardProps {
   hasApprovedWFH: boolean;
   nearestLocation: any;
   canAttend: boolean;
+  isLoadingLocation?: boolean;
   onWFHSuccess: () => void;
   onRetryLocation: () => void;
 }
@@ -24,6 +25,7 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
   hasApprovedWFH,
   nearestLocation,
   canAttend,
+  isLoadingLocation = false,
   onWFHSuccess,
   onRetryLocation
 }) => {
@@ -79,11 +81,14 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
                     </Dialog>
                   </div>
                   
-                  <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="text-xs text-yellow-800 font-medium">💡 Tips Mengaktifkan Lokasi:</p>
-                    <p className="text-xs text-yellow-700">
-                      Klik ikon 🔒 atau 📍 di sebelah kiri URL browser → Pilih "Allow" untuk lokasi
-                    </p>
+                  <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-xs text-blue-800 font-medium mb-2">🔧 Cara Reset Permission Lokasi:</p>
+                    <div className="text-xs text-blue-700 space-y-1">
+                      <p><strong>Chrome/Edge:</strong> Klik ikon 🔒 di address bar → Pilih "Site settings" → Reset permissions</p>
+                      <p><strong>Firefox:</strong> Klik ikon 🛡️ di address bar → Clear permissions and reload</p>
+                      <p><strong>Safari:</strong> Settings → Websites → Location → Reset untuk situs ini</p>
+                      <p className="mt-2 font-medium text-blue-800">💡 Atau refresh halaman (F5/Ctrl+R) dan klik "Allow" saat diminta lokasi</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -211,9 +216,32 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-            <Clock className="h-5 w-5 text-gray-500 mr-3 animate-spin" />
-            <p className="text-gray-600">Mengambil lokasi...</p>
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center">
+              <Clock className="h-5 w-5 text-blue-500 mr-3 animate-spin" />
+              <div>
+                <p className="text-blue-800 font-medium">
+                  {isLoadingLocation ? '🔍 Mencari lokasi...' : '⏳ Memuat...'}
+                </p>
+                <p className="text-blue-600 text-sm">
+                  {isLoadingLocation 
+                    ? 'Menggunakan strategi multiple untuk akurasi terbaik'
+                    : 'Mempersiapkan sistem lokasi'
+                  }
+                </p>
+              </div>
+            </div>
+            {isLoadingLocation && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRetryLocation}
+                disabled={isLoadingLocation}
+                className="border-blue-300 text-blue-700"
+              >
+                ⏸️ Batal
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

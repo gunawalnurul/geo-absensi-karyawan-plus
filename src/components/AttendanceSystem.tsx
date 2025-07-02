@@ -14,6 +14,7 @@ const AttendanceSystem = () => {
     locationError, 
     isWithinGeofence, 
     nearestLocation,
+    isLoadingLocation,
     refreshLocation 
   } = useLocation();
   
@@ -219,6 +220,7 @@ const AttendanceSystem = () => {
         hasApprovedWFH={hasApprovedWFH}
         nearestLocation={nearestLocation}
         canAttend={canAttend}
+        isLoadingLocation={isLoadingLocation}
         onWFHSuccess={handleWFHSuccess}
         onRetryLocation={refreshLocation}
       />

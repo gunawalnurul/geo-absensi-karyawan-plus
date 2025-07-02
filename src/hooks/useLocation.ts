@@ -8,6 +8,7 @@ export const useLocation = () => {
   const [isWithinGeofence, setIsWithinGeofence] = useState(false);
   const [nearestLocation, setNearestLocation] = useState<any>(null);
   const [geofenceLocations, setGeofenceLocations] = useState<any[]>([]);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   const fetchGeofenceLocations = async () => {
     try {
@@ -29,13 +30,25 @@ export const useLocation = () => {
   };
 
   const getLocation = async () => {
+    if (isLoadingLocation) {
+      console.log('📍 Location request already in progress, skipping...');
+      return;
+    }
+
+    setIsLoadingLocation(true);
+    console.log('📍 Starting location acquisition...');
+    
     try {
       const coords = await getCurrentLocation();
       setCurrentLocation(coords);
       setLocationError('');
+      console.log('✅ Location successfully obtained and set:', coords);
     } catch (error) {
-      setLocationError((error as Error).message);
-      console.log('📍 Location error but checking WFH status...');
+      const errorMessage = (error as Error).message;
+      setLocationError(errorMessage);
+      console.log('❌ Location error:', errorMessage);
+    } finally {
+      setIsLoadingLocation(false);
     }
   };
 
@@ -91,6 +104,7 @@ export const useLocation = () => {
     isWithinGeofence,
     nearestLocation,
     geofenceLocations,
+    isLoadingLocation,
     refreshLocation: getLocation
   };
 };
