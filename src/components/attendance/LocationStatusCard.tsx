@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,11 +30,24 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
   onRetryLocation
 }) => {
   const [showWFHForm, setShowWFHForm] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const handleWFHSuccess = () => {
     onWFHSuccess();
     setShowWFHForm(false);
   };
+
+  const handleRetryLocation = useCallback(async () => {
+    if (isRetrying || isLoadingLocation) return;
+    
+    setIsRetrying(true);
+    try {
+      await onRetryLocation();
+    } finally {
+      // Add a small delay to prevent rapid clicking
+      setTimeout(() => setIsRetrying(false), 2000);
+    }
+  }, [onRetryLocation, isRetrying, isLoadingLocation]);
 
   return (
     <Card>
@@ -58,10 +71,11 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={onRetryLocation}
+                      onClick={handleRetryLocation}
+                      disabled={isRetrying || isLoadingLocation}
                       className="border-red-300 text-red-700 hover:bg-red-100"
                     >
-                      🔄 Coba Lagi
+                      {isRetrying ? '⏳ Mencoba...' : '🔄 Coba Lagi'}
                     </Button>
                     <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
                       <DialogTrigger asChild>
