@@ -128,9 +128,30 @@ const LoginForm = () => {
                 </div>
               </div>
 
+              {/* Password hints */}
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+                <p className="text-xs text-gray-600 font-medium mb-1">💡 Password Default:</p>
+                <p className="text-xs text-gray-500">• Karyawan baru: <span className="font-mono font-semibold">karyawan123</span></p>
+                <p className="text-xs text-gray-500">• Test accounts: <span className="font-mono font-semibold">password123</span></p>
+              </div>
+
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
                 {loading ? 'Memproses...' : 'Masuk'}
               </Button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-blue-600 hover:text-blue-500 underline"
+                  onClick={() => toast({
+                    title: 'Reset Password',
+                    description: 'Hubungi administrator untuk reset password atau gunakan password default "karyawan123" untuk akun baru.',
+                    duration: 5000,
+                  })}
+                >
+                  Lupa Password?
+                </button>
+              </div>
             </form>
           </CardContent>
         </Card>

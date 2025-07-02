@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Search, Edit, Trash2, User, Users, Building, Banknote } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import EmployeeForm from './employee/EmployeeForm';
 import EmployeeTable from './employee/EmployeeTable';
 
 const EmployeeManagement = () => {
   const { profile } = useAuth();
   const { employees, loading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -38,8 +40,25 @@ const EmployeeManagement = () => {
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
-      await createEmployee(employeeData);
-      setShowForm(false);
+      const result = await createEmployee(employeeData);
+      if (result.data && !result.error) {
+        setShowForm(false);
+        // Show login credentials notification
+        toast({
+          title: 'Karyawan Berhasil Ditambahkan!',
+          description: (
+            <div className="space-y-2">
+              <p>Karyawan <strong>{employeeData.name}</strong> telah berhasil didaftarkan.</p>
+              <div className="bg-blue-50 p-2 rounded border">
+                <p className="text-sm font-medium text-blue-700">Kredensial Login:</p>
+                <p className="text-sm text-blue-600">Email: <span className="font-mono">{employeeData.email}</span></p>
+                <p className="text-sm text-blue-600">Password: <span className="font-mono font-semibold">karyawan123</span></p>
+              </div>
+            </div>
+          ),
+          duration: 8000,
+        });
+      }
     } catch (error) {
       console.error('Error adding employee:', error);
     }

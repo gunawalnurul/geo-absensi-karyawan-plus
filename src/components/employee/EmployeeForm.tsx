@@ -162,9 +162,22 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }: EmployeeFormProps) => {
                 <p className="text-sm text-red-500">{employeeIdError}</p>
               )}
               {!employee && (
-                <p className="text-xs text-gray-500">
-                  ID akan dibuat otomatis berdasarkan urutan terakhir
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500">
+                    ID akan dibuat otomatis berdasarkan urutan terakhir
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <p className="text-xs text-blue-700 font-medium">
+                      ℹ️ Informasi Login Default
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Password default: <span className="font-mono font-semibold">karyawan123</span>
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Karyawan dapat login menggunakan email dan password default ini
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 
