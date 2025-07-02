@@ -31,16 +31,16 @@ export const getCurrentLocation = (): Promise<{lat: number, lng: number}> => {
           
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Akses lokasi ditolak. Jika Anda memiliki persetujuan Work From Home yang aktif, Anda tetap dapat melakukan absensi.';
+              errorMessage = 'Akses lokasi ditolak oleh browser. Untuk mengaktifkan lokasi: klik ikon kunci/lokasi di address bar browser, pilih "Allow/Izinkan". Atau ajukan Work From Home untuk absensi tanpa lokasi.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Informasi lokasi tidak tersedia. Pastikan GPS aktif atau gunakan Work From Home jika disetujui.';
+              errorMessage = 'Lokasi tidak tersedia. Pastikan GPS aktif, koneksi internet stabil, dan izin lokasi diaktifkan. Atau ajukan Work From Home jika disetujui.';
               break;
             case error.TIMEOUT:
-              errorMessage = 'Timeout dalam mengambil lokasi. Coba lagi atau gunakan Work From Home jika disetujui.';
+              errorMessage = 'Waktu habis saat mengambil lokasi. Coba lagi dengan koneksi internet yang lebih stabil atau ajukan Work From Home.';
               break;
             default:
-              errorMessage = 'Terjadi error dalam mengambil lokasi. Gunakan Work From Home jika disetujui.';
+              errorMessage = 'Gagal mengambil lokasi. Periksa pengaturan browser dan koneksi internet, atau ajukan Work From Home.';
               break;
           }
           

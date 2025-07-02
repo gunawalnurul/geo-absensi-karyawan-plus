@@ -45,19 +45,47 @@ export const LocationStatusCard: React.FC<LocationStatusCardProps> = ({
       <CardContent>
         {locationError ? (
           <div className="space-y-4">
-            <div className="flex items-center p-4 bg-red-50 rounded-lg">
-              <XCircle className="h-5 w-5 text-red-500 mr-3" />
-              <div className="flex-1">
-                <p className="text-red-800 font-medium">Error Lokasi</p>
-                <p className="text-red-600 text-sm">{locationError}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={onRetryLocation}
-                  className="mt-2"
-                >
-                  Coba Lagi
-                </Button>
+            <div className="p-4 bg-red-50 rounded-lg border-l-4 border-red-400">
+              <div className="flex items-start">
+                <XCircle className="h-5 w-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-red-800 font-medium mb-1">🚫 Akses Lokasi Bermasalah</p>
+                  <p className="text-red-700 text-sm leading-relaxed mb-3">{locationError}</p>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onRetryLocation}
+                      className="border-red-300 text-red-700 hover:bg-red-100"
+                    >
+                      🔄 Coba Lagi
+                    </Button>
+                    <Dialog open={showWFHForm} onOpenChange={setShowWFHForm}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          🏠 Ajukan WFH Sekarang
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <WFHRequestForm 
+                          onClose={() => setShowWFHForm(false)}
+                          onSuccess={handleWFHSuccess}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  
+                  <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+                    <p className="text-xs text-yellow-800 font-medium">💡 Tips Mengaktifkan Lokasi:</p>
+                    <p className="text-xs text-yellow-700">
+                      Klik ikon 🔒 atau 📍 di sebelah kiri URL browser → Pilih "Allow" untuk lokasi
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
